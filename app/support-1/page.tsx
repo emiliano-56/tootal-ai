@@ -38,7 +38,7 @@ export default function SupportPage() {
           </a>
 
           <a
-            href="mailto:gdev615x@gmail.com"
+            href="mailto:emiliano715x@gmail.com"
             className="w-full md:w-auto px-8 py-4 rounded-2xl border border-gray-200 text-blue-600 font-semibold hover:bg-blue-600 hover:text-white transition"
           >
             aipippipinfo@gmail.com
