@@ -1,5 +1,6 @@
 import { Sidebar } from '@/components/sidebar'
 import { Header } from '@/components/header'
+import { MobileNavProvider } from '@/components/mobile-nav-context'
 
 export default function ShellLayout({
   children,
@@ -15,12 +16,14 @@ export default function ShellLayout({
         backgroundColor: '#f8fafc',
       }}
     >
-      <Sidebar />
-      <Header />
+      <MobileNavProvider>
+        <Sidebar />
+        <Header />
 
-      <div className="pt-16 md:pl-64 flex w-full">
-        <main className="flex-1 w-full min-w-0">{children}</main>
-      </div>
+        <div className="pt-16 md:pl-64 flex w-full">
+          <main className="flex-1 w-full min-w-0">{children}</main>
+        </div>
+      </MobileNavProvider>
     </div>
   )
 }

@@ -15,9 +15,10 @@ import {
 import { Button } from '@/components/ui/button'
 import { useEffect, useRef, useState } from 'react'
 import { supabase, signOut } from '@/lib/db'
+import { useMobileNav } from '@/components/mobile-nav-context'
 
 export function Header() {
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const { open: openMobileNav } = useMobileNav()
 
   const [userEmail, setUserEmail] = useState('Comic Creator')
   const [userLetter, setUserLetter] = useState('C')
@@ -219,7 +220,12 @@ export function Header() {
 
         {/* Left Side */}
         <div className="flex items-center gap-4 flex-1">
-          <button className="md:hidden text-foreground">
+          <button
+            type="button"
+            onClick={openMobileNav}
+            aria-label="Open menu"
+            className="md:hidden text-foreground p-1 -ml-1 rounded-lg hover:bg-slate-100 active:bg-slate-200 transition-colors"
+          >
             <Menu className="w-6 h-6" />
           </button>
 

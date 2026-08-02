@@ -23,6 +23,7 @@ import {
   Video,
   FolderOpen,
   History,
+  X,
 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
@@ -30,6 +31,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/db'
+import { useMobileNav } from '@/components/mobile-nav-context'
 
 interface MenuItem {
   icon: typeof Home
@@ -91,8 +93,33 @@ const menuGroups: MenuGroup[] = [
 
 export function Sidebar() {
   const pathname = usePathname()
+  const { isOpen, close } = useMobileNav()
 
   const [userPlan, setUserPlan] = useState('')
+
+  // Close the drawer whenever navigation lands on a new page.
+  useEffect(() => {
+    close()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname])
+
+  // Escape closes the drawer, and the page behind it must not scroll while open.
+  useEffect(() => {
+    if (!isOpen) return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') close()
+    }
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    document.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isOpen, close])
 
   useEffect(() => {
     const fetchUserPlan = async () => {
@@ -153,21 +180,47 @@ export function Sidebar() {
   const upgradeData = getUpgradeData()
 
   return (
-   <aside className="hidden md:flex flex-col w-64 bg-white border-r border-gray-200 h-screen fixed left-0 top-0 z-40">
+   <>
+  {/* Mobile backdrop */}
+  <div
+    onClick={close}
+    aria-hidden="true"
+    className={cn(
+      'md:hidden fixed inset-0 z-[1090] bg-slate-900/50 backdrop-blur-sm transition-opacity duration-300',
+      isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+    )}
+  />
+
+   <aside
+     className={cn(
+       'flex flex-col w-64 bg-white border-r border-gray-200 h-screen fixed left-0 top-0 z-[1100] md:z-40 transition-transform duration-300 ease-out md:translate-x-0',
+       isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
+     )}
+   >
   {/* Logo */}
   <div className="p-6 border-b border-gray-200 flex items-center gap-3">
     <img
-      src="./nlogo2.png "
+      src="/nlogo2.png"
       alt="ComicTale AI Logo"
       className="w-10 h-10 rounded-full object-cover"
     />
 
-    <div>
+    <div className="flex-1 min-w-0">
       <h1 className="font-bold text-black text-sm">ComicTale AI</h1>
       <p className="text-xs text-gray-500">
         Create, Launch, Inspire.
       </p>
     </div>
+
+    {/* Close — mobile only */}
+    <button
+      type="button"
+      onClick={close}
+      aria-label="Close menu"
+      className="md:hidden -mr-2 p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+    >
+      <X className="w-5 h-5" />
+    </button>
   </div>
 
   {/* Menu */}
@@ -231,6 +284,7 @@ export function Sidebar() {
     </div>
   )}
 </aside>
+   </>
   )
 }
 
