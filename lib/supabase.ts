@@ -1,21 +1,13 @@
-import { createClient } from '@supabase/supabase-js'
-
 /**
- * Browser Supabase client.
+ * Browser Supabase client — compatibility re-export.
  *
- * The anon key is safe to expose (it is protected by Row Level Security), but it
- * still comes from the environment so every credential lives in one place.
- * Copy .env.example to .env.local to configure it.
+ * The real client moved to `lib/supabase/client.ts` when sessions were
+ * switched from localStorage to cookies, so that middleware and server
+ * components can read the same session. This file stays so the existing
+ * `@/lib/supabase` and `@/lib/db` imports keep working unchanged.
+ *
+ * New code should import from '@/lib/supabase/client' (browser) or
+ * '@/lib/supabase/server' (server components and route handlers).
  */
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error(
-    'Missing Supabase configuration. Add NEXT_PUBLIC_SUPABASE_URL and ' +
-      'NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.local, then restart the dev server.'
-  )
-}
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export { supabase, createClient } from './supabase/client'

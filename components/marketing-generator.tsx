@@ -1,4 +1,5 @@
 'use client'
+import { consumeFeature } from '@/lib/plans/use-feature'
 
 import { useState } from 'react'
 import { Megaphone, Sparkles, Mail, Search, FileText, Share2, ShoppingBag } from 'lucide-react'
@@ -37,7 +38,17 @@ export function MarketingGenerator() {
   const [tab, setTab] = useState<TabKey>('ads')
 
   const generate = async () => {
+
     if (!product.trim()) return
+
+    // Charged only once the input is valid — an empty submit would otherwise
+    // cost one of the month's allowance and generate nothing.
+    const allowance = await consumeFeature('marketing')
+
+    if (!allowance.ok) {
+      setError(allowance.error ?? 'Monthly limit reached')
+      return
+    }
 
     setLoading(true)
     setError(null)

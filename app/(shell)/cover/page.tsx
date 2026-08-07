@@ -16,6 +16,9 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase"
+import { useGenerationApi } from '@/components/generation-config'
+import { consumeFeature } from '@/lib/plans/use-feature'
+import { UsageBadge } from '@/components/usage-badge'
 
 const aspectRatios = [
   {
@@ -129,6 +132,8 @@ interface SavedCover {
 }
 
 export default function Page() {
+  const GENERATION_API_URL = useGenerationApi()
+
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
   const [generatedImage, setGeneratedImage] = useState("");
@@ -144,7 +149,7 @@ export default function Page() {
 
   const API_BASE =
     process.env.NEXT_PUBLIC_API_URL ||
-    "https://zoop-a1-v2.onrender.com";
+    GENERATION_API_URL;
 
 
 
@@ -222,41 +227,17 @@ export default function Page() {
     setNicheOpen(false);
   };
 
-  const deductCredits = async (userId: string) => {
-    try {
-      // get current credits
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('credits')
-        .eq('id', userId)
-        .single()
+  const deductCredits = async (_userId: string, _pages = 1) => {
+    // Monthly allowance rather than a credit balance. The count is applied
+    // server-side, so this asks and reports rather than deciding.
+    const result = await consumeFeature('cover')
 
-      if (error || !data) return false
-
-      const currentCredits = Number(data.credits || 0)
-
-      if (currentCredits < 10) {
-        toast.error('Not enough credits (10 credits required)')
-        return false
-      }
-
-      const newCredits = currentCredits - 10
-
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ credits: newCredits })
-        .eq('id', userId)
-
-      if (updateError) {
-        console.error(updateError)
-        return false
-      }
-
-      return true
-    } catch (err) {
-      console.error(err)
+    if (!result.ok) {
+      toast.error(result.error ?? 'Monthly limit reached')
       return false
     }
+
+    return true
   }
 
   const generateImage = async () => {
@@ -280,7 +261,7 @@ export default function Page() {
 
       userId = user.id;
 
-      // CHECK + DEDUCT CREDITS BEFORE GENERATION
+      // Spend one of this month's allowance before generating
       const allowed = await deductCredits(user.id);
 
       if (!allowed) {
@@ -308,7 +289,7 @@ export default function Page() {
 
       if (data.success) {
         setGeneratedImage(data.image_url);
-        toast.success("Book cover generated (10 credits used)");
+        toast.success("Book cover generated");
       } else {
         toast.error(data.message || "Generation failed");
 
@@ -630,10 +611,14 @@ export default function Page() {
               ) : (
                 <>
                   <Palette className="h-4 w-4" />
-                  Create Book Cover (10 credits)
+                  Create Book Cover
                 </>
               )}
             </button>
+
+            <div className="mt-2 text-center">
+              <UsageBadge feature="cover" />
+            </div>
           </div>
         </div>
 

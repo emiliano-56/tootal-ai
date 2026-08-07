@@ -17,7 +17,8 @@ import {
   StepProgress,
 } from '@/components/agent-ui'
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'https://zoop-a1-v2.onrender.com'
+import { useGenerationApi } from '@/components/generation-config'
+import { consumeFeature } from '@/lib/plans/use-feature'
 
 const STEPS = [
   { key: 'copy', label: 'Writing title, blurb and art direction' },
@@ -63,6 +64,8 @@ function wrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): st
 }
 
 export function CoverDesigner() {
+  const API = useGenerationApi()
+
   const [idea, setIdea] = useState('')
   const [author, setAuthor] = useState('')
   const [genre, setGenre] = useState('')
@@ -300,7 +303,17 @@ export function CoverDesigner() {
   }
 
   const run = async () => {
+
     if (!idea.trim()) return
+
+    // Charged only once the input is valid — an empty submit would otherwise
+    // cost one of the month's allowance and generate nothing.
+    const allowance = await consumeFeature('cover-designer')
+
+    if (!allowance.ok) {
+      setError(allowance.error ?? 'Monthly limit reached')
+      return
+    }
 
     setRunning(true)
     setError(null)

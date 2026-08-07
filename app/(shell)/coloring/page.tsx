@@ -17,9 +17,19 @@ import {
 import { supabase } from "@/lib/supabase"
 import { Footer } from '@/components/footer'
 
-const API =  "https://zoop-a1-v2.onrender.com"
+import { useGenerationApi } from '@/components/generation-config'
+import { consumeFeature } from '@/lib/plans/use-feature'
+import { UsageBadge } from '@/components/usage-badge'
+import { usePromptPrefill } from '@/lib/dfy/use-prefill'
+import { uploadCover } from '@/lib/share/cover'
+import { useLibrarySave } from '@/components/use-library-save'
 
 export default function Page() {
+  const API = useGenerationApi()
+
+  // The keep-limit, the full-library dialog and Drive backup all live here.
+  const library = useLibrarySave()
+
 
   const router = useRouter()
 
@@ -52,6 +62,9 @@ export default function Page() {
     page_size: "8.5 x 11"
   })
 
+  // Arriving from a DFY pack with a printable prompt.
+  usePromptPrefill((prompt) => setForm((current) => ({ ...current, book_idea: prompt })))
+
   const toggleDropdown = (key: keyof typeof openDropdowns) => {
     setOpenDropdowns(prev => ({
       ...prev,
@@ -59,43 +72,17 @@ export default function Page() {
     }))
   }
 
-  const deductCredits = async (userId: string, pages: number) => {
-    try {
-      const creditsNeeded = pages * 15
+  const deductCredits = async (_userId: string, _pages = 1) => {
+    // Monthly allowance rather than a credit balance. The count is applied
+    // server-side, so this asks and reports rather than deciding.
+    const result = await consumeFeature('coloring')
 
-      // get current credits
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('credits')
-        .eq('id', userId)
-        .single()
-
-      if (error || !data) return false
-
-      const currentCredits = Number(data.credits || 0)
-
-      if (currentCredits < creditsNeeded) {
-        toast.error(`Not enough credits (${creditsNeeded} credits required)`)
-        return false
-      }
-
-      const newCredits = currentCredits - creditsNeeded
-
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ credits: newCredits })
-        .eq('id', userId)
-
-      if (updateError) {
-        console.error(updateError)
-        return false
-      }
-
-      return true
-    } catch (err) {
-      console.error(err)
+    if (!result.ok) {
+      toast.error(result.error ?? 'Monthly limit reached')
       return false
     }
+
+    return true
   }
 
   // =====================================================
@@ -161,7 +148,7 @@ export default function Page() {
 
       userId = user.id
 
-      // CHECK + DEDUCT CREDITS BEFORE GENERATION
+      // Spend one of this month's allowance before generating
       const allowed = await deductCredits(user.id, coloringBook.pages.length)
 
       if (!allowed) {
@@ -171,7 +158,7 @@ export default function Page() {
       setLoadingImages(true)
     } catch (err) {
       console.error(err)
-      toast.error("Failed to process credits")
+      toast.error("Could not start that generation")
       return
     }
 
@@ -224,7 +211,7 @@ export default function Page() {
     }
 
     setLoadingImages(false)
-    toast.success(`${coloringBook.pages.length * 15} credits used`)
+    toast.success(`Coloring book ready — ${coloringBook.pages.length} pages`)
   }
 
   // =====================================================
@@ -245,6 +232,8 @@ export default function Page() {
         format: "a4"
       })
 
+      let coverDataUrl = ""
+
       for (let i = 0; i < elements.length; i++) {
 
         const canvas = await html2canvas(
@@ -257,6 +246,10 @@ export default function Page() {
         )
 
         const imgData = canvas.toDataURL("image/jpeg", 1.0)
+
+        // The first page doubles as the thumbnail a social network shows when
+        // this book is shared — it is already drawn, so keeping it is free.
+        if (i === 0) coverDataUrl = imgData
 
         const pageWidth = pdf.internal.pageSize.getWidth()
         const pageHeight = pdf.internal.pageSize.getHeight()
@@ -326,13 +319,18 @@ export default function Page() {
         return
       }
 
+      const coverUrl = coverDataUrl ? await uploadCover(coverDataUrl, pdfTitle) : null
+
       // SAVE PDF RECORD TO DATABASE
       const { error: dbError } = await supabase
         .from("colorings")
         .insert({
           user_id: user.id,
           title: pdfTitle,
-          pdf_path: filePath
+          pdf_path: filePath,
+          // Null if the upload failed; a missing thumbnail costs a nicer
+          // share card, never the book itself.
+          cover_url: coverUrl
         })
 
       if (dbError) {
@@ -342,7 +340,14 @@ export default function Page() {
         return
       }
 
-      alert("Coloring PDF saved successfully")
+      await library.save({
+        kind: "coloring",
+        title: pdfTitle,
+        bucket: "comic-pdfs",
+        path: filePath,
+        coverUrl: coverUrl ?? undefined,
+        sizeBytes: pdfBlob.size,
+      })
 
     } catch (err) {
 
@@ -843,10 +848,14 @@ export default function Page() {
               ) : (
                 <>
                   <Palette className="w-5 h-5" />
-                  Step 2: Generate Coloring ({form.number_of_pages * 15} credits)
+                  Step 2: Generate Coloring ({form.number_of_pages} pages)
                 </>
               )}
             </button>
+
+            <div className="mt-2 text-center">
+              <UsageBadge feature="coloring" />
+            </div>
 
           </div>
 
@@ -937,6 +946,9 @@ export default function Page() {
 
       </div>
       {/* Footer */}
+      {/* Asks what should go when the keep-limit is reached. */}
+      {library.dialog}
+
       <Footer />
     </main>
   )

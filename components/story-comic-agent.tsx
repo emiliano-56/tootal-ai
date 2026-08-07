@@ -17,7 +17,9 @@ import {
   StepProgress,
 } from '@/components/agent-ui'
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'https://zoop-a1-v2.onrender.com'
+import { useGenerationApi } from '@/components/generation-config'
+import { consumeFeature } from '@/lib/plans/use-feature'
+import { usePromptPrefill } from '@/lib/dfy/use-prefill'
 
 const STEPS = [
   { key: 'story', label: 'Writing the story and script' },
@@ -34,7 +36,12 @@ interface RenderedPanel {
 }
 
 export function StoryComicAgent() {
+  const API = useGenerationApi()
+
   const [idea, setIdea] = useState('')
+
+  // Arriving from a DFY pack: the storybook prompt lands in the box.
+  usePromptPrefill(setIdea)
   const [pages, setPages] = useState(3)
   const [panelsPerPage, setPanelsPerPage] = useState(4)
   const [style, setStyle] = useState('Modern comic book, bold ink, vibrant colour')
@@ -50,8 +57,6 @@ export function StoryComicAgent() {
   const [panels, setPanels] = useState<RenderedPanel[]>([])
 
   const totalPanels = pages * panelsPerPage
-  const creditCost = totalPanels * 20
-
   const reset = () => {
     setScript(null)
     setPanels([])
@@ -62,7 +67,17 @@ export function StoryComicAgent() {
   }
 
   const run = async () => {
+
     if (!idea.trim()) return
+
+    // Charged only once the input is valid — an empty submit would otherwise
+    // cost one of the month's allowance and generate nothing.
+    const allowance = await consumeFeature('comic-agent')
+
+    if (!allowance.ok) {
+      setError(allowance.error ?? 'Monthly limit reached')
+      return
+    }
 
     reset()
     setRunning(true)
@@ -170,9 +185,7 @@ export function StoryComicAgent() {
           characters: comicScript.characters,
           pageCount: comicScript.pages?.length ?? 0,
           panelCount: withBubbles.length,
-        },
-        creditsUsed: creditCost,
-      })
+        },      })
     } catch (err: any) {
       setFailedIndex(stepIndex)
       setError(err.message || 'Something went wrong.')
@@ -332,7 +345,9 @@ export function StoryComicAgent() {
 
               <div className="flex items-center justify-between text-xs bg-slate-50 rounded-xl px-3.5 py-2.5 ring-1 ring-slate-200">
                 <span className="text-slate-500">{totalPanels} panels total</span>
-                <span className="font-semibold text-indigo-600">{creditCost} credits</span>
+                <span className="font-semibold text-indigo-600">
+                  {totalPanels === 1 ? '1 image' : `${totalPanels} images`}
+                </span>
               </div>
 
               <PrimaryButton

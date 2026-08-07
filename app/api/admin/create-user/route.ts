@@ -1,18 +1,18 @@
-import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-
-const supabaseUrl =  'https://xcsbwpagpvixxwupnmwn.supabase.co'
-const supabaseServiceKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhjc2J3cGFncHZpeHh3dXBubXduIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3OTQ0Njk2OCwiZXhwIjoyMDk1MDIyOTY4fQ.z17C5sFJXvjlvQK1IQWcF4QHsR2IKr0ky3_XSUdfgSc"
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
-  },
-})
+import { supabaseAdmin as supabase } from '@/lib/supabase-admin'
+import { getSessionContext } from '@/lib/supabase/server'
+import { can } from '@/lib/auth/rbac'
 
 export async function POST(request: NextRequest) {
   try {
+    // This route holds the service-role client, which bypasses every RLS
+    // policy — so it has to establish the caller's role itself.
+    const session = await getSessionContext()
+
+    if (!session || !can(session.role, 'users.create')) {
+      return NextResponse.json({ error: 'Not authorised' }, { status: 403 })
+    }
+
     const { email, password, credits, plan } = await request.json()
 
     if (!email || !password) {

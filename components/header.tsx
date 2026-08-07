@@ -16,15 +16,14 @@ import { Button } from '@/components/ui/button'
 import { useEffect, useRef, useState } from 'react'
 import { supabase, signOut } from '@/lib/db'
 import { useMobileNav } from '@/components/mobile-nav-context'
+import { usePlanLabel } from '@/components/entitlements-context'
 
 export function Header() {
   const { open: openMobileNav } = useMobileNav()
 
   const [userEmail, setUserEmail] = useState('Comic Creator')
-  const [userLetter, setUserLetter] = useState('C')
-
-  const [userCredits, setUserCredits] = useState(0)
-  const [userPlan, setUserPlan] = useState('Free Plan')
+  const [userLetter, setUserLetter] = useState('C')  // From user_plans, not the old free-text profiles.plans column.
+  const userPlan = usePlanLabel()
 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [isEmailTooltipOpen, setIsEmailTooltipOpen] = useState(false)
@@ -54,7 +53,7 @@ export function Header() {
         // GET PROFILE
         const { data, error } = await supabase
           .from('profiles')
-          .select('email, credits, plans')
+          .select('email')
           .eq('id', user.id)
           .single()
 
@@ -73,16 +72,6 @@ export function Header() {
               data.email.charAt(0).toUpperCase()
             )
           }
-
-          // CREDITS
-          setUserCredits(
-            Number(data.credits || 0)
-          )
-
-          // PLAN
-          setUserPlan(
-            data.plans || 'Free Plan'
-          )
         }
       } catch (error) {
         console.error('[v0] Header user fetch error:', error)
@@ -236,12 +225,12 @@ export function Header() {
         {/* Right Side */}
         <div className="flex items-center gap-4">
 
-          {/* Credits */}
+          {/* Current plan */}
           <div className="hidden sm:flex items-center gap-2 px-4 py-2 bg-white rounded-lg">
             <Zap className="w-4 h-4 text-blue-600" />
 
             <span className="text-sm font-semibold text-black">
-              {userCredits} Credits
+              {userPlan}
             </span>
           </div>
 

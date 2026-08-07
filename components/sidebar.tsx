@@ -24,14 +24,20 @@ import {
   FolderOpen,
   History,
   X,
+  Lock,
+  Package,
+  Bot,
+  Share2,
 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+import { FEATURE_KEYS } from '@/lib/plans/entitlements'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/db'
 import { useMobileNav } from '@/components/mobile-nav-context'
+import { useEntitlements } from '@/components/entitlements-context'
 
 interface MenuItem {
   icon: typeof Home
@@ -61,6 +67,19 @@ const menuGroups: MenuGroup[] = [
       { icon: Sparkles, label: 'Prompt Studio', href: '/prompt-studio', badge: 'NEW' },
     ],
   },
+  // What OTO 2 and OTO 3 buy. Given a heading of their own rather than being
+  // filed under Library, because each is the whole reason its tier exists —
+  // buried in a list they would look like another bonus.
+  {
+    heading: 'Done For You',
+    items: [
+      { icon: Package, label: 'DFY Businesses', href: '/dfy-business', badge: 'OTO 2' },
+      { icon: Bot, label: 'Autopilot', href: '/autopilot', badge: 'OTO 3' },
+      // Not gated: sharing by hand is for everyone, and only Autopilot needs
+      // the connections to be automatic.
+      { icon: Share2, label: 'Connections', href: '/connections' },
+    ],
+  },
   {
     heading: 'Create',
     items: [
@@ -83,8 +102,8 @@ const menuGroups: MenuGroup[] = [
   {
     heading: 'Account',
     items: [
-      { icon: Coins, label: 'My Credits', href: '/credits' },
-      { icon: BadgeDollarSign, label: 'Reseller', href: '/reseller' },
+      { icon: Coins, label: 'My Plan', href: '/credits' },
+      { icon: BadgeDollarSign, label: 'Reseller', href: '/reseller-program' },
       { icon: ShieldCheck, label: 'White Label', href: '/white-labels' },
       { icon: HelpCircle, label: 'Support', href: '/support' },
     ],
@@ -94,6 +113,7 @@ const menuGroups: MenuGroup[] = [
 export function Sidebar() {
   const pathname = usePathname()
   const { isOpen, close } = useMobileNav()
+  const { limits } = useEntitlements()
 
   const [userPlan, setUserPlan] = useState('')
 
@@ -236,6 +256,11 @@ export function Sidebar() {
         {group.items.map((item) => {
           const Icon = item.icon
           const isActive = pathname === item.href
+          // A tool is locked when the plan does not grant it at all. Running
+          // out for the month is a different thing and stays unlocked.
+          const feature = item.href.replace(/^\//, '')
+          const gated = FEATURE_KEYS.includes(feature as never)
+          const locked = gated && !(feature in limits)
 
           return (
             <Link
@@ -252,6 +277,13 @@ export function Sidebar() {
               <Icon className="w-[18px] h-[18px] shrink-0" />
 
               <span className="flex-1 text-left truncate">{item.label}</span>
+
+              {locked && (
+                <Lock
+                  className="w-3.5 h-3.5 shrink-0 opacity-60"
+                  aria-label="Not included in your plan"
+                />
+              )}
 
               {item.badge && (
                 <span

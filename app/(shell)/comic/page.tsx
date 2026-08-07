@@ -21,9 +21,18 @@ import { supabase } from "@/lib/supabase"
 import { Footer } from '@/components/footer'
 import { OptionPicker } from '@/components/option-picker'
 
-const API = "https://zoop-a1-v2.onrender.com"
+import { useGenerationApi } from '@/components/generation-config'
+import { consumeFeature } from '@/lib/plans/use-feature'
+import { UsageBadge } from '@/components/usage-badge'
+import { uploadCover } from '@/lib/share/cover'
+import { useLibrarySave } from '@/components/use-library-save'
 
 export default function Page() {
+  const API = useGenerationApi()
+
+  // The keep-limit, the full-library dialog and Drive backup all live here.
+  const library = useLibrarySave()
+
 
   const router = useRouter()
 
@@ -69,43 +78,17 @@ export default function Page() {
     })
   }
 
-  const deductCredits = async (userId: string, pages: number) => {
-    try {
-      const creditsNeeded = pages * 20
+  const deductCredits = async (_userId: string, _pages = 1) => {
+    // Monthly allowance rather than a credit balance. The count is applied
+    // server-side, so this asks and reports rather than deciding.
+    const result = await consumeFeature('comic')
 
-      // get current credits
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('credits')
-        .eq('id', userId)
-        .single()
-
-      if (error || !data) return false
-
-      const currentCredits = Number(data.credits || 0)
-
-      if (currentCredits < creditsNeeded) {
-        toast.error(`Not enough credits (${creditsNeeded} credits required)`)
-        return false
-      }
-
-      const newCredits = currentCredits - creditsNeeded
-
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ credits: newCredits })
-        .eq('id', userId)
-
-      if (updateError) {
-        console.error(updateError)
-        return false
-      }
-
-      return true
-    } catch (err) {
-      console.error(err)
+    if (!result.ok) {
+      toast.error(result.error ?? 'Monthly limit reached')
       return false
     }
+
+    return true
   }
 
   // =====================================================
@@ -171,7 +154,7 @@ export default function Page() {
 
       userId = user.id
 
-      // CHECK + DEDUCT CREDITS BEFORE GENERATION
+      // Spend one of this month's allowance before generating
       const allowed = await deductCredits(user.id, comic.pages.length)
 
       if (!allowed) {
@@ -181,7 +164,7 @@ export default function Page() {
       setLoadingImages(true)
     } catch (err) {
       console.error(err)
-      toast.error("Failed to process credits")
+      toast.error("Could not start that generation")
       return
     }
 
@@ -234,7 +217,7 @@ export default function Page() {
     }
 
     setLoadingImages(false)
-    toast.success(`${comic.pages.length * 20} credits used`)
+    toast.success(`Comic ready — ${comic.pages.length} pages`)
   }
 
   // =====================================================
@@ -258,6 +241,8 @@ export default function Page() {
         format: "a4"
       })
 
+      let coverDataUrl = ""
+
       for (let i = 0; i < elements.length; i++) {
 
         const canvas = await html2canvas(
@@ -270,6 +255,10 @@ export default function Page() {
         )
 
         const imgData = canvas.toDataURL("image/jpeg", 1.0)
+
+        // The first page doubles as the thumbnail a social network shows when
+        // this comic is shared — it is already drawn, so keeping it is free.
+        if (i === 0) coverDataUrl = imgData
 
         const pageWidth = pdf.internal.pageSize.getWidth()
         const pageHeight = pdf.internal.pageSize.getHeight()
@@ -339,13 +328,18 @@ export default function Page() {
         return
       }
 
+      const coverUrl = coverDataUrl ? await uploadCover(coverDataUrl, pdfTitle) : null
+
       // SAVE PDF RECORD TO DATABASE
       const { error: dbError } = await supabase
         .from("comics")
         .insert({
           user_id: user.id,
           title: pdfTitle,
-          pdf_path: filePath
+          pdf_path: filePath,
+          // Null if the upload failed; a missing thumbnail costs a nicer
+          // share card, never the comic itself.
+          cover_url: coverUrl
         })
 
       if (dbError) {
@@ -355,7 +349,20 @@ export default function Page() {
         return
       }
 
-      alert("Comic PDF saved successfully")
+      // Record it in the library, which is what counts against the keep
+      // limit. A full library asks the customer what should go rather than
+      // failing or quietly discarding this one.
+      await library.save(
+        {
+          kind: "comic",
+          title: pdfTitle,
+          bucket: "comic-pdfs",
+          path: filePath,
+          coverUrl: coverUrl ?? undefined,
+          sizeBytes: pdfBlob.size,
+        },
+        coverUrl ?? undefined
+      )
 
     } catch (err) {
 
@@ -584,9 +591,7 @@ export default function Page() {
             <div>
               <div className="flex items-baseline justify-between mb-2">
                 <label className={`${fieldLabel} mb-0`}>Pages</label>
-                <span className="text-[11px] font-semibold text-indigo-600">
-                  {form.number_of_pages * 20} credits
-                </span>
+                <UsageBadge feature="comic" />
               </div>
 
               <div className="grid grid-cols-5 gap-1.5">
@@ -957,6 +962,9 @@ export default function Page() {
 
       </div>
       {/* Footer */}
+      {/* Asks what should go when the keep-limit is reached. */}
+      {library.dialog}
+
       <Footer />
     </main>
   )

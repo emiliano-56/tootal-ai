@@ -1,4 +1,5 @@
 'use client'
+import { consumeFeature } from '@/lib/plans/use-feature'
 
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/db'
@@ -127,6 +128,15 @@ export function PromptStudio() {
   const enhance = async () => {
     const value = draft.trim()
     if (!value) return
+
+    // Charged only once the input is valid — an empty submit would otherwise
+    // cost one of the month's allowance and generate nothing.
+    const allowance = await consumeFeature('prompt-studio')
+
+    if (!allowance.ok) {
+      setEnhanceError(allowance.error ?? 'Monthly limit reached')
+      return
+    }
 
     setEnhancing(true)
     setEnhanceError(null)

@@ -1,25 +1,26 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from 'next/server'
+import { complete, AiError } from '@/lib/ai/deepseek'
+
+/**
+ * Book generation endpoint.
+ *
+ * Goes through lib/ai/deepseek, which resolves the key from the
+ * `api_credentials` table (managed under Superadmin → AI Providers), falls
+ * through the provider chain on failure, and records usage. No key is read or
+ * held here.
+ */
+
+const SYSTEM_PROMPT =
+  'You are a professional Amazon KDP book generator. Your output must be structured using ONLY plain text. ' +
+  'Use numbered headings like: 1. Title, 2. Description, 3. Chapter Outline, 4. Chapter 1. ' +
+  'Do NOT use Markdown (#, **, *, or ---). Do not add emojis. Ensure formatting is clean and publication-ready.'
 
 export async function POST(request: NextRequest) {
   try {
-    const { prompt, chapters, niches } = await request.json();
+    const { prompt, chapters, niches } = await request.json()
 
     if (!prompt || !chapters || !niches) {
-      return NextResponse.json(
-        { error: "All fields are required" },
-        { status: 400 }
-      );
-    }
-
-    // Read from the environment only — a hardcoded fallback would ship the key
-    // inside the repo. Set DEEPSEEK_API_KEY in .env.local.
-    const apiKey = process.env.DEEPSEEK_API_KEY?.trim();
-
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: "DEEPSEEK_API_KEY is not set. Add it to .env.local and restart." },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'All fields are required' }, { status: 400 })
     }
 
     const bookPrompt = `Create a detailed outline and first chapter for a book with the following specifications:
@@ -34,67 +35,26 @@ Please provide:
 3. Chapter outline for all ${chapters} chapters
 4. Full text of Chapter 1 (approximately 500-1000 words)
 
-Format the response clearly with headers and sections.`;
+Format the response clearly with headers and sections.`
 
-    const response = await fetch(
-      "https://api.deepseek.com/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: "deepseek-chat",
-          messages: [
-            // ✅ SYSTEM ROLE ADDED (IMPORTANT FIX)
-            {
-              role: "system",
-              content:
-                 "You are a professional Amazon KDP book generator. Your output must be structured using ONLY plain text. Use numbered headings like: 1. Title, 2. Description, 3. Chapter Outline, 4. Chapter 1. Do NOT use Markdown (#, **, *, or ---). Do not add emojis. Ensure formatting is clean and publication-ready.",
-            },
-            {
-              role: "user",
-              content: bookPrompt,
-            },
-          ],
-          temperature: 0.8,
-          max_tokens: 4000,
-        }),
-      }
-    );
+    const content = await complete({
+      system: SYSTEM_PROMPT,
+      prompt: bookPrompt,
+      temperature: 0.8,
+      maxTokens: 4000,
+    })
 
-    const data = await response.json();
+    return NextResponse.json({ content })
+  } catch (error) {
+    console.error('[BOOK API ERROR]:', error)
 
-    if (!response.ok) {
-      return NextResponse.json(
-        {
-          error:
-            data.error?.message ||
-            "Failed to generate book",
-        },
-        { status: response.status }
-      );
+    if (error instanceof AiError) {
+      return NextResponse.json({ error: error.message }, { status: error.status })
     }
 
-    const bookContent =
-      data.choices?.[0]?.message?.content ||
-      "No content generated";
-
-    return NextResponse.json({
-      content: bookContent,
-    });
-  } catch (error) {
-    console.error("[BOOK API ERROR]:", error);
-
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Internal server error",
-      },
+      { error: error instanceof Error ? error.message : 'Internal server error' },
       { status: 500 }
-    );
+    )
   }
 }

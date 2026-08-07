@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { useRouter } from "next/navigation"
 import { Footer } from '@/components/footer'
 import { PdfThumbnail } from '@/components/pdf-thumbnail'
+import { ShareBar } from '@/components/share-bar'
 
 interface ComicFile {
   name: string
@@ -15,6 +16,9 @@ interface ComicFile {
   title: string
   created_at: string
   type: "comic" | "coloring"
+  // Saved alongside the PDF. Networks cannot render a PDF, so this is what
+  // they show when the comic is shared.
+  cover_url?: string | null
 }
 
 interface VideoFile {
@@ -452,6 +456,16 @@ export default function MyComicsPage() {
                       </p>
 
                       <div className="flex gap-2">
+                        <ShareBar
+                          compact
+                          source={{
+                            kind: 'comic',
+                            title: comic.title,
+                            bucket: 'comic-pdfs',
+                            path: comic.pdf_path,
+                            previewUrl: comic.cover_url ?? undefined,
+                          }}
+                        />
                         <Button
                           onClick={() => handleDownload(comic.pdf_path, comic.title)}
                           disabled={downloading === comic.pdf_path || deleting !== null}
@@ -541,6 +555,19 @@ export default function MyComicsPage() {
                       <p className="text-[11px] text-slate-500 mt-0.5 mb-2.5">
                         {new Date(video.created_at).toLocaleDateString()}
                       </p>
+
+                      <div className="mb-2">
+                        <ShareBar
+                          compact
+                          source={{
+                            kind: 'video',
+                            title: video.name,
+                            bucket: 'video',
+                            path: video.video_path,
+                            publicUrl: video.url,
+                          }}
+                        />
+                      </div>
 
                       <Button
                         onClick={() => handleDownloadVideo(video.video_path, video.name)}

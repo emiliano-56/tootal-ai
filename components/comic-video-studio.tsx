@@ -31,7 +31,8 @@ import { LibraryPicker, type LibraryItem } from '@/components/library-picker'
 import { supabase } from '@/lib/db'
 import { AgentHeader, Card, PrimaryButton, ErrorNote, Field, inputClass } from '@/components/agent-ui'
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'https://zoop-a1-v2.onrender.com'
+import { useGenerationApi } from '@/components/generation-config'
+import { consumeFeature } from '@/lib/plans/use-feature'
 
 const MOVES: { value: CameraMove; label: string }[] = [
   { value: 'zoom-in', label: 'Zoom In' },
@@ -52,6 +53,8 @@ interface EditableShot extends Shot {
 }
 
 export function ComicVideoStudio() {
+  const API = useGenerationApi()
+
   const [supported, setSupported] = useState(true)
   const [shots, setShots] = useState<EditableShot[]>([])
   const [aspect, setAspect] = useState<AspectKey>('landscape')
@@ -220,6 +223,18 @@ export function ComicVideoStudio() {
       update(shot.id, {
         clipStatus: 'failed',
         clipError: 'Add a caption or story context first.',
+      })
+      return false
+    }
+
+    // Charged only once the input is valid — a shot with no caption would
+    // otherwise cost one of the month's allowance and generate nothing.
+    const allowance = await consumeFeature('comic-video')
+
+    if (!allowance.ok) {
+      update(shot.id, {
+        clipStatus: 'failed',
+        clipError: allowance.error ?? 'Monthly limit reached',
       })
       return false
     }

@@ -30,8 +30,8 @@ const statConfig = [
     wash: 'from-pink-50',
   },
   {
-    key: 'credits',
-    label: 'Credits Remaining',
+    key: 'tools',
+    label: 'Tools Unlocked',
     icon: Coins,
     gradient: 'from-amber-400 to-orange-500',
     glow: 'group-hover:shadow-amber-500/20',
@@ -71,7 +71,7 @@ function AnimatedNumber({ value }: { value: number }) {
 }
 
 export function StatsRow() {
-  const [counts, setCounts] = useState({ comics: 0, colorings: 0, videos: 0, credits: 0 })
+  const [counts, setCounts] = useState({ comics: 0, colorings: 0, videos: 0, tools: 0 })
 
   useEffect(() => {
     const fetchCounts = async () => {
@@ -86,14 +86,15 @@ export function StatsRow() {
           supabase.from('comics').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
           supabase.from('colorings').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
           supabase.storage.from('video').list(user.id),
-          supabase.from('profiles').select('credits').eq('id', user.id).single(),
+          fetch('/api/usage').then((r) => r.json()).catch(() => ({ unlocked: [] })),
         ])
 
         setCounts({
           comics: comicsRes.count || 0,
           colorings: coloringsRes.count || 0,
           videos: videosRes.data?.filter((f) => f.id && f.name.includes('.')).length || 0,
-          credits: Number(profileRes.data?.credits || 0),
+          // Monthly allowances replaced the credit balance.
+          tools: (profileRes as { unlocked?: string[] })?.unlocked?.length ?? 0,
         })
       } catch (error) {
         console.error('[v0] StatsRow fetch error:', error)

@@ -28,9 +28,7 @@ export interface AgentJob<TInput = unknown, TOutput = unknown> {
   total_steps: number
   input: TInput
   output: TOutput | null
-  error: string | null
-  credits_used: number
-  created_at: string
+  error: string | null  created_at: string
   updated_at: string
 }
 

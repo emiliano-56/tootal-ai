@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { Fredoka, Plus_Jakarta_Sans } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
+import { ThemeProvider } from "@/components/theme-provider"
 import "./globals.css"
 
 // Display face — rounded and playful, used for headings and numbers.
@@ -24,7 +25,9 @@ export const metadata: Metadata = {
 
   // ✅ Favicon using your external image URL
   icons: {
-    icon: "nlogo2.png",
+    // Absolute: a relative path resolves against the current route, so
+    // /admin would request /admin/nlogo2.png and 404.
+    icon: "/nlogo2.png",
   },
 
   openGraph: {
@@ -50,9 +53,13 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={`${fredoka.variable} ${jakarta.variable}`}>
+    <html lang="en" className={`${fredoka.variable} ${jakarta.variable}`} suppressHydrationWarning>
       <body className="font-sans antialiased bg-background text-foreground">
-        {children}
+        {/* defaultTheme light so the existing dashboard looks unchanged until
+            someone opts into dark; enableSystem honours an OS preference. */}
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
+          {children}
+        </ThemeProvider>
         {process.env.NODE_ENV === "production" && <Analytics />}
       </body>
     </html>

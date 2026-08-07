@@ -1,16 +1,17 @@
 import 'server-only'
 
+import { resolveCredentials, logApiUsage } from '@/lib/ai/credentials'
+
 /**
  * Shared server-side LLM client.
  *
  * Every agent goes through this module so prompting, JSON parsing, retries and
  * error handling live in one place instead of being re-implemented per route.
  *
- * The API key is read from the environment only — never hardcode it here, since
+ * Keys come from the `api_credentials` table, managed in the superadmin
+ * console, with the environment variable as a fallback. Nothing is hardcoded:
  * anything in source travels with the repo.
  */
-
-const DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions'
 
 export type ChatRole = 'system' | 'user' | 'assistant'
 
@@ -39,54 +40,79 @@ export class AiError extends Error {
   }
 }
 
-function getApiKey(): string {
-  const key = process.env.DEEPSEEK_API_KEY?.trim()
-
-  if (!key) {
-    throw new AiError(
-      'DEEPSEEK_API_KEY is not set. Add it to .env.local and restart the dev server.',
-      500
-    )
-  }
-
-  return key
-}
-
 async function callDeepseek(
   messages: ChatMessage[],
   { temperature = 0.7, maxTokens = 2000, json = false }: Omit<CompleteOptions, 'prompt' | 'system'>
 ): Promise<string> {
-  const res = await fetch(DEEPSEEK_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${getApiKey()}`,
-    },
-    body: JSON.stringify({
-      model: 'deepseek-chat',
-      messages,
-      temperature,
-      max_tokens: maxTokens,
-      ...(json ? { response_format: { type: 'json_object' } } : {}),
-    }),
-  })
+  const credentials = await resolveCredentials('deepseek')
 
-  const data = await res.json().catch(() => null)
-
-  if (!res.ok) {
+  if (credentials.length === 0) {
     throw new AiError(
-      data?.error?.message || `AI request failed (HTTP ${res.status})`,
-      res.status
+      'No DeepSeek key configured. Add one under Superadmin → AI Providers.',
+      500
     )
   }
 
-  const content: string | undefined = data?.choices?.[0]?.message?.content
+  let lastError: AiError | null = null
 
-  if (!content) {
-    throw new AiError('AI returned an empty response.', 502)
+  // Walk the failover chain: a dead or rate-limited key moves to the next one
+  // rather than failing the whole job.
+  for (const credential of credentials) {
+    const startedAt = Date.now()
+
+    try {
+      const res = await fetch(credential.baseUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${credential.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: credential.model || 'deepseek-chat',
+          messages,
+          temperature,
+          max_tokens: maxTokens,
+          ...(json ? { response_format: { type: 'json_object' } } : {}),
+        }),
+      })
+
+      const data = await res.json().catch(() => null)
+
+      if (!res.ok) {
+        throw new AiError(
+          data?.error?.message || `AI request failed (HTTP ${res.status})`,
+          res.status
+        )
+      }
+
+      const content: string | undefined = data?.choices?.[0]?.message?.content
+
+      if (!content) throw new AiError('AI returned an empty response.', 502)
+
+      await logApiUsage({
+        credentialId: credential.id,
+        provider: 'deepseek',
+        operation: json ? 'completeJson' : 'complete',
+        latencyMs: Date.now() - startedAt,
+        succeeded: true,
+      })
+
+      return content
+    } catch (error) {
+      lastError = error instanceof AiError ? error : new AiError(String(error), 502)
+
+      await logApiUsage({
+        credentialId: credential.id,
+        provider: 'deepseek',
+        operation: json ? 'completeJson' : 'complete',
+        latencyMs: Date.now() - startedAt,
+        succeeded: false,
+        errorMessage: lastError.message,
+      })
+    }
   }
 
-  return content
+  throw lastError ?? new AiError('AI request failed.', 502)
 }
 
 /** Plain text completion. */

@@ -4,10 +4,22 @@ import { useState } from "react"
 import { supabase } from "@/lib/supabase"
 import { Footer } from "@/components/footer"
 import { Film, ArrowLeft, Save, Download, X, Check, Volume2, VolumeX, Sparkles, Search, Plus } from "lucide-react"
+import { useGenerationUrl } from '@/components/generation-config'
+import { consumeFeature } from '@/lib/plans/use-feature'
 
+import { usePromptPrefill } from '@/lib/dfy/use-prefill'
+import { useLibrarySave } from '@/components/use-library-save'
 export default function Page() {
+  const generationUrl = useGenerationUrl()
+
+  // The keep-limit, the full-library dialog and Drive backup all live here.
+  const library = useLibrarySave()
+
   const [currentStep, setCurrentStep] = useState(1)
   const [description, setDescription] = useState("")
+
+  // Arriving from a DFY pack with a rhyme or video script.
+  usePromptPrefill(setDescription)
   const [aspectRatio, setAspectRatio] = useState("16:9")
   // Must match an entry in `niches` exactly so the chip shows as selected.
   const [niche, setNiche] = useState("Technology")
@@ -123,6 +135,14 @@ const niches = [
   }
 
   const handleGenerate = async () => {
+    // Spend one of this month's allowance before doing any work.
+    const allowance = await consumeFeature('video')
+
+    if (!allowance.ok) {
+      setError(allowance.error ?? 'Monthly limit reached')
+      return
+    }
+
     if (!description) {
       setError("Please describe what you want to create")
       return
@@ -138,7 +158,7 @@ const niches = [
     setVideoUrl("")
 
     try {
-      const res = await fetch("https://zoop-a1-v2.onrender.com/text-video/generate-video", {
+      const res = await fetch(generationUrl("text-video/generate-video"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -226,7 +246,20 @@ const niches = [
       const { data: publicData } = supabase.storage.from("video").getPublicUrl(filePath)
 
       setSavedVideoUrl(publicData.publicUrl)
-      alert("Video saved successfully")
+
+      // Videos previously existed only as objects in a bucket — nothing was
+      // written down, so they could not be listed, counted or backed up.
+      await library.save(
+        {
+          kind: "video",
+          title: filePath.split("/").pop() ?? "Video",
+          bucket: "video",
+          path: filePath,
+          publicUrl: publicData.publicUrl,
+          sizeBytes: file.size,
+        },
+        publicData.publicUrl
+      )
     } catch (error: any) {
       console.log(error)
       setError(error.message)
@@ -743,7 +776,10 @@ return (
       )}
     </div>
     </div>
-    <Footer />
+    {/* Asks what should go when the keep-limit is reached. */}
+      {library.dialog}
+
+      <Footer />
 
     {/* DOWNLOAD MODAL */}
     {downloadModal && (

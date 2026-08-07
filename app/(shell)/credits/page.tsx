@@ -2,14 +2,21 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Zap, CheckCircle } from 'lucide-react'
+import { ArrowLeft, Zap, CheckCircle, Infinity as InfinityIcon, Lock } from 'lucide-react'
+import { FEATURES } from '@/lib/plans/entitlements'
 import { supabase } from '@/lib/db'
 import { Footer } from '@/components/footer'
 
 interface UserProfile {
-  credits: number
   plans: string
   email: string
+}
+
+/** Monthly allowances, which replaced the old credit balance. */
+interface Allowances {
+  limits: Record<string, number | null>
+  usage: Record<string, number>
+  plans: { code: string; name: string }[]
 }
 
 const availablePlans = [
@@ -126,13 +133,14 @@ const availablePlans = [
   },
 ]
 
-export default function MyCreditsPage() {
+export default function MyPlanPage() {
   const router = useRouter()
 
   const [loading, setLoading] = useState(true)
+  const [allowances, setAllowances] = useState<Allowances | null>(null)
 
   const [profile, setProfile] = useState<UserProfile>({
-    credits: 0,
+
     plans: 'Free Plan',
     email: '',
   })
@@ -148,7 +156,7 @@ export default function MyCreditsPage() {
 
         const { data, error } = await supabase
           .from('profiles')
-          .select('credits, plans, email')
+          .select('plans, email')
           .eq('id', user.id)
           .single()
 
@@ -159,24 +167,61 @@ export default function MyCreditsPage() {
 
         if (data) {
           setProfile({
-            credits: Number(data.credits || 0),
+
             plans: data.plans || 'Free Plan',
             email: data.email || '',
           })
         }
       } catch (error) {
-        console.error('[v0] Credits page error:', error)
+        console.error('[v0] Plan page error:', error)
       } finally {
         setLoading(false)
       }
     }
 
     fetchProfile()
+
+
+    
+
+
+    // Monthly allowances replaced the credit balance.
+
+
+    fetch('/api/usage')
+
+
+      .then((response) => response.json())
+
+
+      .then((payload) => setAllowances(payload))
+
+
+      .catch(() => setAllowances(null))
   }, [])
 
-  const filteredPlans = availablePlans.filter(
-    (plan) => plan.name !== profile.plans
-  )
+  const held = allowances?.plans ?? []
+
+  /**
+   * A bundle is named on its own; otherwise the tiers are shown as the chain
+   * the customer climbed — "Front End + Unlimited + OTO 2".
+   */
+  const bundle = held.find((plan) => plan.code === 'mega')
+
+  const headlinePlan = bundle
+    ? bundle.name
+    : held.length > 0
+      ? held.map((plan) => plan.name).join(' + ')
+      : null
+
+  // Under a bundle headline, spell out what it contains.
+  const includedTiers = bundle
+    ? held.filter((plan) => plan.code !== 'mega').map((plan) => plan.name)
+    : []
+
+  const ownedNames = new Set(held.map((plan) => plan.name))
+
+  const filteredPlans = availablePlans.filter((plan) => !ownedNames.has(plan.name))
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -195,11 +240,11 @@ export default function MyCreditsPage() {
 
             <div>
               <h1 className="text-3xl font-extrabold text-black mb-1">
-                My Credits
+                My Plan
               </h1>
 
               <p className="text-gray-500">
-                Manage your credits and view available ComicTale AI plans.
+                Your monthly allowances and the upgrades available to you.
               </p>
             </div>
           </div>
@@ -207,7 +252,7 @@ export default function MyCreditsPage() {
           {/* Current Balance */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-10">
 
-            {/* Credits Card */}
+            {/* Monthly allowance */}
             <div className="bg-white border border-gray-100 shadow-sm rounded-2xl p-7 animate-in fade-in slide-in-from-bottom-2 duration-500">
               <div className="flex items-center gap-4 mb-4">
                 <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-md shadow-amber-500/25">
@@ -215,18 +260,16 @@ export default function MyCreditsPage() {
                 </div>
 
                 <div>
-                  <p className="text-gray-500 text-sm font-medium">
-                    Available Credits
-                  </p>
+                  <p className="text-gray-500 text-sm font-medium">Tools unlocked</p>
 
                   <h2 className="text-4xl font-extrabold text-black">
-                    {loading ? '...' : profile.credits}
+                    {allowances ? Object.keys(allowances.limits).length : '...'}
                   </h2>
                 </div>
               </div>
 
               <p className="text-gray-500 text-sm">
-                Your available balance for generating comics, storybooks, and coloring pages.
+                Allowances reset on the 1st of each month. Your remaining uses are listed below.
               </p>
             </div>
 
@@ -237,20 +280,99 @@ export default function MyCreditsPage() {
                   <CheckCircle className="w-7 h-7 text-white" />
                 </div>
 
-                <div>
+                <div className="min-w-0">
                   <p className="text-gray-500 text-sm font-medium">
                     Current Plan
                   </p>
 
+                  {/* From user_plans, not the old free-text column — a bundle
+                      shows as the bundle, and stacked tiers show as a chain. */}
                   <h2 className="text-2xl font-bold text-black">
-                    {loading ? 'Loading...' : profile.plans}
+                    {!allowances ? 'Loading…' : (headlinePlan ?? 'No plan yet')}
                   </h2>
                 </div>
               </div>
 
-              <p className="text-gray-500 text-sm">
-                This is your currently active ComicTale AI plan.
-              </p>
+              {includedTiers.length > 0 ? (
+                <div>
+                  <p className="text-gray-500 text-xs font-medium mb-1.5">Includes</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {includedTiers.map((name) => (
+                      <span
+                        key={name}
+                        className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[11px] font-semibold"
+                      >
+                        {name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-gray-500 text-sm">
+                  This is your currently active ComicTale AI plan.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Monthly usage per tool */}
+          <div className="mb-10">
+            <h2 className="text-xl font-bold text-black mb-4">This month</h2>
+
+            <div className="rounded-2xl bg-white border border-gray-100 shadow-sm divide-y divide-gray-100">
+              {FEATURES.map((feature) => {
+                const owned = allowances ? feature.key in allowances.limits : false
+                const limit = allowances?.limits[feature.key] ?? null
+                const used = allowances?.usage[feature.key] ?? 0
+                const unlimited = owned && limit === null
+                const percent = limit ? Math.min(100, Math.round((used / limit) * 100)) : 0
+
+                return (
+                  <div key={feature.key} className="p-4 flex items-center justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      <p className={`text-sm font-medium ${owned ? 'text-black' : 'text-gray-400'}`}>
+                        {feature.label}
+                      </p>
+
+                      {owned && !unlimited && (
+                        <div className="mt-2 h-1.5 max-w-[220px] rounded-full bg-gray-100 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${
+                              percent >= 100
+                                ? 'bg-red-500'
+                                : percent >= 80
+                                  ? 'bg-amber-500'
+                                  : 'bg-gradient-to-r from-indigo-500 to-violet-500'
+                            }`}
+                            style={{ width: `${percent}%` }}
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="shrink-0 text-right">
+                      {!allowances ? (
+                        <div className="h-5 w-16 rounded bg-gray-100 animate-pulse" />
+                      ) : !owned ? (
+                        <span className="inline-flex items-center gap-1.5 text-xs text-gray-400">
+                          <Lock className="w-3.5 h-3.5" />
+                          Locked
+                        </span>
+                      ) : unlimited ? (
+                        <span className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-600">
+                          <InfinityIcon className="w-4 h-4" />
+                          Unlimited
+                        </span>
+                      ) : (
+                        <span className="text-sm font-semibold text-black tabular-nums">
+                          {Math.max(0, (limit ?? 0) - used)}{' '}
+                          <span className="text-gray-400 font-normal">of {limit} left</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </div>
 
@@ -261,7 +383,7 @@ export default function MyCreditsPage() {
             </h2>
 
             <p className="text-gray-500">
-              Upgrade your ComicTale AI experience with more credits and exclusive bonuses.
+              Unlock more tools and remove your monthly limits.
             </p>
           </div>
 

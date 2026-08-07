@@ -6,6 +6,7 @@ import { ArrowLeft, Send, Copy, Check, MessageCircle, History, Trash2, Edit2 } f
 import { Button } from '@/components/ui/button' 
 import { Footer } from '@/components/footer' 
 import { supabase } from '@/lib/db'
+import { usePromptPrefill } from '@/lib/dfy/use-prefill'
  
 interface Message { 
  id: string 
@@ -27,6 +28,9 @@ export default function ChatPage() {
  const [activeTab, setActiveTab] = useState<'chat' | 'history'>('chat') 
  const [chatMessages, setChatMessages] = useState<Message[]>([]) 
  const [input, setInput] = useState('') 
+
+ // Arriving from a DFY pack with a tutor prompt.
+ usePromptPrefill(setInput)
  const [loading, setLoading] = useState(false) 
  const [copiedId, setCopiedId] = useState<string | null>(null)
  const [savedChats, setSavedChats] = useState<Chat[]>([])

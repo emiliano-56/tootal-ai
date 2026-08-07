@@ -19,9 +19,7 @@ export interface AgentRun<T = any> {
   current_step: string | null
   input: Record<string, any>
   output: T | null
-  error: string | null
-  credits_used: number
-  created_at: string
+  error: string | null  created_at: string
 }
 
 /** Human label shown in the history list. */
@@ -54,9 +52,7 @@ export async function saveAgentRun(params: {
   output: unknown
   title?: string
   status?: 'succeeded' | 'failed'
-  error?: string
-  creditsUsed?: number
-}): Promise<string | null> {
+  error?: string}): Promise<string | null> {
   try {
     const userId = await currentUserId()
     if (!userId) return null
@@ -71,9 +67,7 @@ export async function saveAgentRun(params: {
         current_step: params.title ?? null,
         input: params.input ?? {},
         output: params.output ?? null,
-        error: params.error ?? null,
-        credits_used: params.creditsUsed ?? 0,
-      })
+        error: params.error ?? null,      })
       .select('id')
       .single()
 
@@ -92,7 +86,7 @@ export async function listAgentRuns(limit = 60): Promise<AgentRun[]> {
 
   const { data, error } = await supabase
     .from('agent_jobs')
-    .select('id, agent, status, progress, current_step, input, output, error, credits_used, created_at')
+    .select('id, agent, status, progress, current_step, input, output, error, created_at')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(limit)

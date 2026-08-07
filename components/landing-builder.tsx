@@ -38,6 +38,7 @@ import {
   downloadText,
 } from '@/components/agent-ui'
 import { saveAgentRun, saveLandingPage } from '@/lib/agents/history'
+import { consumeFeature } from '@/lib/plans/use-feature'
 
 const FONTS: { value: FontChoice; label: string }[] = [
   { value: 'sans', label: 'Sans' },
@@ -98,7 +99,17 @@ export function LandingBuilder() {
   const thankYouHtml = config ? renderThankYouPage(config, renderArgs) : ''
 
   const generate = async () => {
+
     if (!product.trim()) return
+
+    // Charged only once the input is valid — an empty submit would otherwise
+    // cost one of the month's allowance and generate nothing.
+    const allowance = await consumeFeature('landing-pages')
+
+    if (!allowance.ok) {
+      setError(allowance.error ?? 'Monthly limit reached')
+      return
+    }
 
     setLoading(true)
     setError(null)

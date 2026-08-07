@@ -1,4 +1,5 @@
 'use client'
+import { consumeFeature } from '@/lib/plans/use-feature'
 
 import { useState } from 'react'
 import Link from 'next/link'
@@ -104,7 +105,17 @@ export function BusinessAgent() {
   }
 
   const run = async () => {
+
     if (!idea.trim()) return
+
+    // Charged only once the input is valid — an empty submit would otherwise
+    // cost one of the month's allowance and generate nothing.
+    const allowance = await consumeFeature('business-agent')
+
+    if (!allowance.ok) {
+      setError(allowance.error ?? 'Monthly limit reached')
+      return
+    }
 
     setRunning(true)
     setError(null)
