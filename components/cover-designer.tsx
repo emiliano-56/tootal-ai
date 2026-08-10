@@ -472,6 +472,7 @@ export function CoverDesigner() {
                 value={language.value}
                 onChange={language.setValue}
                 allowed={language.allowed}
+              answered={language.answered}
                 className="mb-4"
               />
 

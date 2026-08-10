@@ -596,6 +596,7 @@ export default function Page() {
               value={language.value}
               onChange={language.setValue}
               allowed={language.allowed}
+              answered={language.answered}
             />
 
             <div className="h-px bg-slate-100" />

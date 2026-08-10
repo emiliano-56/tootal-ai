@@ -7,6 +7,7 @@ import {
   LANGUAGES,
   language,
   preferredLanguage,
+  resolveAllowed,
   DEFAULT_LANGUAGE,
 } from '@/lib/i18n/languages'
 import { useLocale } from '@/components/locale-provider'
@@ -23,22 +24,50 @@ import { useLocale } from '@/components/locale-provider'
  * "हिन्दी" faster than "Hindi", and picks the right one more often.
  */
 
-export function useAllowedLanguages(): { allowed: string[]; loading: boolean } {
-  const [allowed, setAllowed] = useState<string[]>([DEFAULT_LANGUAGE])
+const ALL_CODES = LANGUAGES.map((entry) => entry.code)
+
+/**
+ * Which languages this account may generate in.
+ *
+ * Starts from the whole catalogue rather than from English alone, and that is
+ * the important part. The old default was `['en']`, so between mount and the
+ * answer arriving — and permanently if the request failed — the picker showed
+ * one language and captioned it "83 more are on the higher tiers". That is a
+ * lie in every case where the cause was a network blip rather than the plan,
+ * and it is indistinguishable from the real thing.
+ *
+ * A restriction is only ever claimed once the server has actually said so.
+ * `answered` carries that, so the upsell line can stay hidden until then.
+ */
+export function useAllowedLanguages(): {
+  allowed: string[]
+  loading: boolean
+  answered: boolean
+} {
+  const [allowed, setAllowed] = useState<string[]>(ALL_CODES)
   const [loading, setLoading] = useState(true)
+  const [answered, setAnswered] = useState(false)
 
   useEffect(() => {
     let cancelled = false
 
-    fetch('/api/languages')
-      .then((response) => response.json())
+    // no-store because a stale answer here is invisible and wrong: the picker
+    // would quietly offer whatever list the browser had cached from before a
+    // plan change, or before the catalogue was extended.
+    fetch('/api/languages', { cache: 'no-store' })
+      .then((response) => (response.ok ? response.json() : null))
       .then((payload) => {
         if (cancelled) return
 
-        setAllowed(payload.allowed ?? [DEFAULT_LANGUAGE])
+        const resolved = resolveAllowed(payload)
+
+        setAllowed(resolved.allowed)
+        setAnswered(resolved.answered)
         setLoading(false)
       })
       .catch(() => {
+        // Leave the full catalogue in place. Offering a language the plan does
+        // not cover is a far smaller problem than hiding eighty of them.
         if (!cancelled) setLoading(false)
       })
 
@@ -47,7 +76,7 @@ export function useAllowedLanguages(): { allowed: string[]; loading: boolean } {
     }
   }, [])
 
-  return { allowed, loading }
+  return { allowed, loading, answered }
 }
 
 /**
@@ -64,12 +93,20 @@ export function LanguagePicker({
   allowed,
   className,
   label = 'Language',
+  answered = true,
 }: {
   value: string
   onChange: (code: string) => void
   allowed: string[]
   className?: string
   label?: string
+  /**
+   * Whether the server has actually said what this account may use. False
+   * while the answer is in flight or after it failed — and the upsell line
+   * stays hidden until it is true, because "N more on the higher tiers" is a
+   * claim about someone's plan and must not be made on a guess.
+   */
+  answered?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -125,6 +162,10 @@ export function LanguagePicker({
       <label className="flex items-center gap-1.5 text-[13px] font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
         <Globe className="w-3.5 h-3.5 text-indigo-500" />
         {label}
+        {/* The count, said out loud. It is the one number that makes "why am I
+            only seeing some of them" answerable at a glance instead of by
+            scrolling and counting. */}
+        <span className="font-normal text-slate-400">· {available.length}</span>
       </label>
 
       <div className="relative">
@@ -207,7 +248,7 @@ export function LanguagePicker({
         )}
       </div>
 
-      {locked > 0 && (
+      {answered && locked > 0 && (
         <p className="mt-1.5 text-[11px] text-slate-400 flex items-start gap-1">
           <Lock className="w-3 h-3 shrink-0 mt-px" />
           <span>
@@ -242,8 +283,9 @@ export function useLanguage(storageKey = 'comictale-language'): {
   setValue: (code: string) => void
   allowed: string[]
   loading: boolean
+  answered: boolean
 } {
-  const { allowed, loading } = useAllowedLanguages()
+  const { allowed, loading, answered } = useAllowedLanguages()
   const { locale } = useLocale()
   const [value, setValue] = useState(DEFAULT_LANGUAGE)
   const [touched, setTouched] = useState(false)
@@ -285,5 +327,6 @@ export function useLanguage(storageKey = 'comictale-language'): {
     },
     allowed,
     loading,
+    answered,
   }
 }

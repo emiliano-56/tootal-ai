@@ -885,6 +885,7 @@ export function ComicVideoStudio() {
                   value={language.value}
                   onChange={language.setValue}
                   allowed={language.allowed}
+              answered={language.answered}
                 />
               </div>
 

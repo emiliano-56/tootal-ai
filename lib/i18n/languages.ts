@@ -181,6 +181,42 @@ export function canUseLanguage(code: string, allowed: string[]): boolean {
   return allowed.includes(language(code)?.code ?? code)
 }
 
+/**
+ * What the picker should offer, given whatever came back from the server.
+ *
+ * Separated from the React hook so the failure cases can be tested, because
+ * the failure cases are where this went wrong. The old hook defaulted to
+ * `['en']`, so a request that was merely in flight — or that failed — showed
+ * one language and captioned it "83 more are on the higher tiers". That reads
+ * as a plan restriction and is indistinguishable from one.
+ *
+ * The rules:
+ *
+ *   - No answer yet, or a bad one: offer everything, claim nothing. Offering a
+ *     language the plan does not cover is a far smaller problem than hiding
+ *     eighty of them behind a false upsell.
+ *   - A real answer: use it exactly, and only then say what is locked.
+ *
+ * An empty array counts as a bad answer rather than "nothing allowed". A tier
+ * that permits no languages at all is not a thing the business sells, so an
+ * empty list is far more likely to be a failed query than a real restriction.
+ */
+export function resolveAllowed(payload: unknown): { allowed: string[]; answered: boolean } {
+  const all = LANGUAGES.map((entry) => entry.code)
+
+  if (!payload || typeof payload !== 'object') return { allowed: all, answered: false }
+
+  const list = (payload as { allowed?: unknown }).allowed
+
+  if (!Array.isArray(list) || list.length === 0) return { allowed: all, answered: false }
+
+  const codes = list.filter((code): code is string => typeof code === 'string' && code.length > 0)
+
+  if (codes.length === 0) return { allowed: all, answered: false }
+
+  return { allowed: codes, answered: true }
+}
+
 /** "a", "a and b", "a, b and c" — for reading aloud inside a prompt. */
 function inWords(items: string[]): string {
   if (items.length <= 1) return items[0] ?? ''

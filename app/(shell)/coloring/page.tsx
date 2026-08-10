@@ -556,6 +556,7 @@ export default function Page() {
               value={language.value}
               onChange={language.setValue}
               allowed={language.allowed}
+              answered={language.answered}
             />
 
             {/* STYLE PICKER */}

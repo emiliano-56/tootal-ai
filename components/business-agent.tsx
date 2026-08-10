@@ -430,6 +430,7 @@ export function BusinessAgent() {
                 value={language.value}
                 onChange={language.setValue}
                 allowed={language.allowed}
+              answered={language.answered}
               />
 
               <PrimaryButton

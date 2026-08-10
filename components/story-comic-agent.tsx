@@ -332,6 +332,7 @@ export function StoryComicAgent() {
                 value={language.value}
                 onChange={language.setValue}
                 allowed={language.allowed}
+              answered={language.answered}
               />
 
               <div className="grid grid-cols-2 gap-3">
