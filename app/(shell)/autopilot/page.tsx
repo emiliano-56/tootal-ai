@@ -1,7 +1,7 @@
 import { AutopilotManager } from '@/components/autopilot-manager'
 
 export const metadata = {
-  title: 'Autopilot - ComicTale AI',
+  title: 'Autopilot - ComicAgent AI',
   description: 'Hands-free comic production on your own calendar',
 }
 

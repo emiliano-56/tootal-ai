@@ -1,7 +1,7 @@
 import { PortalGate } from '@/components/console/portal-page'
 import { SocialManager } from '@/components/console/social-manager'
 
-export const metadata = { title: 'Social apps - ComicTale AI' }
+export const metadata = { title: 'Social apps - ComicAgent AI' }
 
 export default function Page() {
   return (

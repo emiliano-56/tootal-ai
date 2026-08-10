@@ -37,6 +37,7 @@ import {
   ErrorNote,
   downloadText,
 } from '@/components/agent-ui'
+import { useLanguage, LanguagePicker } from '@/components/language-picker'
 import { saveAgentRun, saveLandingPage } from '@/lib/agents/history'
 import { consumeFeature } from '@/lib/plans/use-feature'
 
@@ -71,6 +72,9 @@ export function LandingBuilder() {
   const [audience, setAudience] = useState('')
   const [price, setPrice] = useState('')
   const [checkoutUrl, setCheckoutUrl] = useState('')
+
+  // What language the sales page is written in.
+  const language = useLanguage()
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -119,7 +123,7 @@ export function LandingBuilder() {
       const res = await fetch('/api/agent/landing-page', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ product, audience, price }),
+        body: JSON.stringify({ product, audience, price, language: language.value }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error || 'Generation failed')
@@ -207,6 +211,12 @@ export function LandingBuilder() {
               className={inputClass}
             />
           </Field>
+
+          <LanguagePicker
+            value={language.value}
+            onChange={language.setValue}
+            allowed={language.allowed}
+          />
         </div>
 
         <div className="mt-5">

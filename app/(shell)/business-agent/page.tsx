@@ -2,7 +2,7 @@ import { BusinessAgent } from '@/components/business-agent'
 import { UsageBadge } from '@/components/usage-badge'
 
 export const metadata = {
-  title: 'AI Business Agent - ComicTale AI',
+  title: 'AI Business Agent - ComicAgent AI',
   description: 'Turn one idea into a launch-ready digital business',
 }
 

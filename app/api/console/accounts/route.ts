@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getSessionContext, PLATFORM_TENANT_ID } from '@/lib/supabase/server'
 import { can, canCreateRole, type Role } from '@/lib/auth/rbac'
 import { checkSeatAvailable, isValidLicenceTier } from '@/lib/services/licences'
+import { isPolicyMode } from '@/lib/ai/policy'
 
 /**
  * Account management for all three consoles.
@@ -207,7 +208,15 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'id and action are required' }, { status: 400 })
   }
 
-  const permission = body.action === 'password' ? 'users.reset_password' : 'users.suspend'
+  const permission =
+    body.action === 'password'
+      ? 'users.reset_password'
+      : // Which keys an account may use is a provider decision, not an account
+        // one — a reseller who can suspend their users must not be able to
+        // point them at their own AI billing.
+        body.action === 'api_policy'
+        ? 'apis.manage'
+        : 'users.suspend'
 
   const { actor, error } = await requireActor(permission)
   if (error) return error
@@ -254,6 +263,25 @@ export async function PATCH(request: NextRequest) {
 
       // The new password itself is never written to the audit trail.
       await writeAudit(actor!, 'account.password_reset', target!.id, { email: target!.email })
+      break
+    }
+
+    case 'api_policy': {
+      if (!isPolicyMode(body.policy)) {
+        return NextResponse.json({ error: 'Unknown API policy' }, { status: 400 })
+      }
+
+      const { error: updateError } = await supabaseAdmin
+        .from('profiles')
+        .update({ api_policy: body.policy })
+        .eq('id', target!.id)
+
+      if (updateError) return NextResponse.json({ error: updateError.message }, { status: 400 })
+
+      await writeAudit(actor!, 'account.api_policy', target!.id, {
+        email: target!.email,
+        policy: body.policy,
+      })
       break
     }
 

@@ -1,5 +1,5 @@
 -- =====================================================================
---  ComicTale AI — Agent Foundation
+--  ComicAgent AI — Agent Foundation
 --  Run once in: Supabase Dashboard → SQL Editor → New query → Run
 --
 --  Safe to re-run: every statement is IF NOT EXISTS / OR REPLACE.

@@ -2,7 +2,7 @@ import { StoryComicAgent } from '@/components/story-comic-agent'
 import { UsageBadge } from '@/components/usage-badge'
 
 export const metadata = {
-  title: 'Story-to-Comic Agent - ComicTale AI',
+  title: 'Story-to-Comic Agent - ComicAgent AI',
   description: 'Turn one idea into a finished comic automatically',
 }
 

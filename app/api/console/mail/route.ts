@@ -56,8 +56,8 @@ export async function POST(request: NextRequest) {
 
     const result = await sendMail({
       to,
-      subject: 'ComicTale AI — test message',
-      html: '<p>This is a test from your ComicTale AI console.</p><p>If you are reading it, the mail server works.</p>',
+      subject: 'ComicAgent AI — test message',
+      html: '<p>This is a test from your ComicAgent AI console.</p><p>If you are reading it, the mail server works.</p>',
       tenantId: session.tenantId,
     })
 
@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
       const context = {
         first_name: recipient.first_name ?? recipient.username ?? 'there',
         email: recipient.email,
-        brand_name: 'ComicTale AI',
+        brand_name: 'ComicAgent AI',
       }
 
       const subject = renderTemplate(broadcast.subject as string, context, { escape: false })

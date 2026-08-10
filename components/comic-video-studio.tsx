@@ -15,6 +15,8 @@ import {
   Music,
   Video as VideoIcon,
   ImageIcon,
+  Volume2,
+  VolumeX,
   X,
 } from 'lucide-react'
 import {
@@ -33,6 +35,12 @@ import { AgentHeader, Card, PrimaryButton, ErrorNote, Field, inputClass } from '
 
 import { useGenerationApi } from '@/components/generation-config'
 import { consumeFeature } from '@/lib/plans/use-feature'
+import { useLanguage, LanguagePicker } from '@/components/language-picker'
+import { MusicPicker } from '@/components/music-picker'
+import { totalSeconds, type Direction } from '@/lib/video/director'
+import { toSrt, toScript, cuesFrom, overrunningShots } from '@/lib/video/narration'
+import { speak, stopSpeaking, checkSpeech } from '@/lib/audio/speech'
+import { narrationScript } from '@/lib/video/director'
 
 const MOVES: { value: CameraMove; label: string }[] = [
   { value: 'zoom-in', label: 'Zoom In' },
@@ -50,6 +58,8 @@ interface EditableShot extends Shot {
   poster?: string
   clipStatus?: 'idle' | 'generating' | 'ready' | 'failed'
   clipError?: string
+  /** Why the director chose this move — worth reading, so it is shown. */
+  intent?: string
 }
 
 export function ComicVideoStudio() {
@@ -78,6 +88,22 @@ export function ComicVideoStudio() {
 
   const [musicUrl, setMusicUrl] = useState<string | null>(null)
   const [musicName, setMusicName] = useState('')
+  const [musicCredit, setMusicCredit] = useState('')
+  const [showMusic, setShowMusic] = useState(false)
+
+  // The narration language. Empty directive for English, so nothing changes
+  // for a customer who never touches it.
+  const language = useLanguage('comictale-video-language')
+
+  const [directing, setDirecting] = useState(false)
+  const [direction, setDirection] = useState<Direction | null>(null)
+
+  // Narration is previewed aloud rather than mixed into the export: the browser
+  // will happily speak it, but `speechSynthesis` exposes no audio stream, so
+  // there is nothing to route into the recorder. The words still reach the
+  // finished video as burned-in captions, and leave as a subtitle file.
+  const [speaking, setSpeaking] = useState(false)
+  const [voiceNote, setVoiceNote] = useState<string | null>(null)
 
   const fileRef = useRef<HTMLInputElement>(null)
   const musicRef = useRef<HTMLInputElement>(null)
@@ -280,6 +306,122 @@ export function ComicVideoStudio() {
   }
 
   /** Writes shot captions with AI, then generates a clip for every shot. */
+/**
+   * Let the AI direct the edit.
+   *
+   * This is the difference between a video and a slideshow with effects on it.
+   * The model reads the panels in order and decides how long each one holds,
+   * which way the camera moves and why, and what the narrator says over it —
+   * rather than the customer picking "Zoom In" from a dropdown for every panel
+   * and typing a prompt by hand.
+   *
+   * Applied to the shots already on the timeline, so it costs nothing to try
+   * and can be run again after reordering.
+   */
+  const directEdit = async () => {
+    if (shots.length === 0) return
+
+    setDirecting(true)
+    setError(null)
+
+    try {
+      const res = await fetch('/api/agent/video-director', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: 'Comic video',
+          // .value, not the hook — the whole object stringifies to
+          // "[object Object]", which no language lookup matches, so the
+          // directive came out empty and every narration was English.
+          language: language.value,
+          audience: 'children',
+          panels: shots.map((shot) => ({ caption: shot.caption, scene: shot.name })),
+        }),
+      })
+
+      const data = await res.json()
+      const direction: Direction | undefined = data?.direction
+
+      if (!direction?.shots?.length) throw new Error(data?.error || 'The director returned nothing')
+
+      // Rebuilt from the shot list rather than patched onto it: the director
+      // may hold on a panel twice, or drop one that adds nothing.
+      const rebuilt: EditableShot[] = direction.shots
+        .map((cut, index) => {
+          const source = shots[cut.panel]
+
+          if (!source) return null
+
+          return {
+            ...source,
+            id: `${source.id}-${index}`,
+            duration: cut.seconds,
+            move: cut.move,
+            caption: cut.narration || source.caption,
+            intent: cut.intent,
+          }
+        })
+        .filter(Boolean) as EditableShot[]
+
+      setShots(rebuilt)
+      setDirection(direction)
+
+      if (data.fellBack) setError(data.reason ?? null)
+    } catch (err: any) {
+      setError(err?.message || 'Could not direct the edit.')
+    } finally {
+      setDirecting(false)
+    }
+  }
+
+  /** Read the whole narration aloud, in the chosen language. */
+  const previewNarration = async () => {
+    if (!direction) return
+
+    if (speaking) {
+      stopSpeaking()
+      setSpeaking(false)
+      return
+    }
+
+    const check = await checkSpeech(language.value)
+
+    // A missing voice is worth saying rather than reading Hindi with an
+    // English voice, which is unintelligible rather than merely accented.
+    setVoiceNote(check.message ?? null)
+
+    if (!check.voice) return
+
+    await speak(narrationScript(direction), {
+      language: language.value,
+      onStart: () => setSpeaking(true),
+      onEnd: () => setSpeaking(false),
+      onError: (message) => {
+        setSpeaking(false)
+        setVoiceNote(message)
+      },
+    })
+  }
+
+  const downloadNarration = (kind: 'srt' | 'txt') => {
+    if (!direction) return
+
+    const body = kind === 'srt' ? toSrt(direction) : toScript(direction)
+    const blob = new Blob([body], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+
+    link.href = url
+    link.download = `${(direction.title || 'narration').replace(/[^\w-]+/g, '-').toLowerCase()}.${kind}`
+    link.click()
+
+    URL.revokeObjectURL(url)
+  }
+
+  // Stop the voice if the customer navigates away mid-sentence — it keeps
+  // talking otherwise, with nothing left on screen to stop it.
+  useEffect(() => () => stopSpeaking(), [])
+
   const autoDirect = async () => {
     if (shots.length === 0) return
 
@@ -708,6 +850,132 @@ export function ComicVideoStudio() {
               <span className="text-sm text-slate-700">AI clips include audio</span>
             </label>
 
+            {/* Directing the edit — the thing that separates a video from a
+                slideshow with effects on it. */}
+            <div className="mb-4 rounded-xl ring-1 ring-indigo-200 bg-indigo-50/50 p-3.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-indigo-900">AI Director</p>
+                  <p className="text-[11px] text-indigo-700/80">
+                    Reads your panels and decides the pacing, the camera and the narration.
+                  </p>
+                </div>
+
+                <button
+                  onClick={directEdit}
+                  disabled={directing || shots.length === 0}
+                  className="h-9 px-4 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-50 shrink-0"
+                >
+                  {directing ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      Directing…
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 className="w-3.5 h-3.5" />
+                      Direct this
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <div className="mt-3">
+                <LanguagePicker
+                  value={language.value}
+                  onChange={language.setValue}
+                  allowed={language.allowed}
+                />
+              </div>
+
+              {direction && (
+                <div className="mt-3 pt-3 border-t border-indigo-200/70 space-y-1">
+                  <p className="text-[11px] text-indigo-900">
+                    <span className="font-semibold">{direction.treatment}</span>
+                  </p>
+                  <p className="text-[11px] text-indigo-700/80">
+                    {direction.shots.length} shots · {totalSeconds(direction)}s · music:{' '}
+                    {direction.musicMood} · voice: {direction.voiceStyle}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Narration.
+                Kept honest about what it can and cannot do: the browser will
+                read the script aloud for free in any of these languages, but
+                `speechSynthesis` gives back no audio stream, so there is
+                nothing to mix into the recording. The words reach the video as
+                burned-in captions, and leave as a subtitle file the customer
+                can use anywhere. */}
+            {direction && cuesFrom(direction).length > 0 && (
+              <div className="mb-4 rounded-xl ring-1 ring-slate-200 bg-slate-50/70 p-3.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-slate-900">Narration</p>
+                    <p className="text-[11px] text-slate-500">
+                      {cuesFrom(direction).length} lines · burned into the video as captions
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={previewNarration}
+                    className="h-9 px-4 rounded-lg bg-slate-900 text-white text-xs font-semibold inline-flex items-center gap-1.5 shrink-0"
+                  >
+                    {speaking ? (
+                      <>
+                        <VolumeX className="w-3.5 h-3.5" />
+                        Stop
+                      </>
+                    ) : (
+                      <>
+                        <Volume2 className="w-3.5 h-3.5" />
+                        Listen
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <div className="mt-2.5 flex flex-wrap gap-2">
+                  <button
+                    onClick={() => downloadNarration('srt')}
+                    className="h-8 px-3 rounded-lg ring-1 ring-slate-200 bg-white text-slate-700 text-[11px] font-semibold inline-flex items-center gap-1.5"
+                  >
+                    <Download className="w-3 h-3" />
+                    Subtitles (.srt)
+                  </button>
+
+                  <button
+                    onClick={() => downloadNarration('txt')}
+                    className="h-8 px-3 rounded-lg ring-1 ring-slate-200 bg-white text-slate-700 text-[11px] font-semibold inline-flex items-center gap-1.5"
+                  >
+                    <Download className="w-3 h-3" />
+                    Script
+                  </button>
+                </div>
+
+                {voiceNote && (
+                  <p className="mt-2.5 text-[11px] text-amber-700 flex items-start gap-1">
+                    <AlertTriangle className="w-3 h-3 shrink-0 mt-px" />
+                    {voiceNote}
+                  </p>
+                )}
+
+                {/* A model asked for atmosphere will write two sentences over a
+                    two-second shot. Better said now than discovered when the
+                    voice is still talking over the next scene. */}
+                {overrunningShots(direction).length > 0 && (
+                  <p className="mt-2 text-[11px] text-amber-700 flex items-start gap-1">
+                    <AlertTriangle className="w-3 h-3 shrink-0 mt-px" />
+                    {overrunningShots(direction).length} shot
+                    {overrunningShots(direction).length === 1 ? ' has' : 's have'} more narration
+                    than fits — lengthen {overrunningShots(direction).length === 1 ? 'it' : 'them'}{' '}
+                    or trim the words.
+                  </p>
+                )}
+              </div>
+            )}
+
             <input
               ref={musicRef}
               type="file"
@@ -723,6 +991,20 @@ export function ComicVideoStudio() {
                 e.target.value = ''
               }}
             />
+
+            <button
+              onClick={() => setShowMusic(true)}
+              className="mt-2 w-full h-9 rounded-lg ring-1 ring-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold inline-flex items-center justify-center gap-1.5"
+            >
+              <Music className="w-3.5 h-3.5 text-pink-600" />
+              Find copyright-free music
+            </button>
+
+            {musicCredit && (
+              <p className="mt-2 text-[10px] text-slate-500 leading-relaxed">
+                <span className="font-semibold text-slate-700">Credit required:</span> {musicCredit}
+              </p>
+            )}
 
             {musicUrl ? (
               <div className="mt-2 flex items-center gap-2 rounded-lg bg-slate-50 ring-1 ring-slate-200 px-3 py-2">
@@ -813,6 +1095,23 @@ export function ComicVideoStudio() {
         onClose={() => setPickerOpen(false)}
         onSelect={importFromLibrary}
       />
+
+      {showMusic && (
+        <MusicPicker
+          onClose={() => setShowMusic(false)}
+          onPick={(track) => {
+            if (musicUrl) URL.revokeObjectURL(musicUrl)
+
+            // Used straight from the source rather than copied: these are
+            // hotlinkable preview URLs, and re-hosting them is a separate
+            // permission from using them.
+            setMusicUrl(track.url)
+            setMusicName(`${track.title}${track.artist ? ` — ${track.artist}` : ''}`)
+            setMusicCredit(track.credit)
+            setShowMusic(false)
+          }}
+        />
+      )}
     </div>
   )
 }

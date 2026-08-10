@@ -1,5 +1,7 @@
 import 'server-only'
 
+import { cache } from 'react'
+
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import type { Role } from '@/lib/auth/rbac'
@@ -55,6 +57,16 @@ export interface SessionContext {
   role: Role
   tenantId: string
   status: 'active' | 'suspended' | 'pending'
+  /**
+   * This account's API-key override, straight off the profile row.
+   *
+   * Carried here because the row is already fetched: resolving it separately
+   * would put an extra query in front of every single AI call, and this is one
+   * column of a row we are holding anyway. Null on a schema older than
+   * migration 003, and null means "no override" rather than any particular
+   * mode — `effectivePolicy` decides what that resolves to.
+   */
+  apiPolicy: string | null
 }
 
 /**
@@ -63,8 +75,15 @@ export interface SessionContext {
  * Always read the role from the database rather than from user metadata —
  * metadata is writable by the user in some Supabase setups, which would make
  * privilege escalation a one-line request.
+ *
+ * Wrapped in `cache()`, which dedupes per request rather than across requests
+ * — so it never serves one visitor's session to another, and every call site
+ * in a single render shares one answer. That matters more than it looks: this
+ * makes two round trips, and `getUser()` is a call to Supabase's auth service
+ * rather than a database query. The shell layout alone was paying for it three
+ * times over before anything rendered.
  */
-export async function getSessionContext(): Promise<SessionContext | null> {
+export const getSessionContext = cache(async function getSessionContext(): Promise<SessionContext | null> {
   const supabase = await createServerSupabase()
 
   const {
@@ -88,5 +107,6 @@ export async function getSessionContext(): Promise<SessionContext | null> {
     role: resolveRoleFromProfile(profile) ?? 'user',
     tenantId: (profile.tenant_id as string) ?? PLATFORM_TENANT_ID,
     status: (profile.status as SessionContext['status']) ?? 'active',
+    apiPolicy: (profile.api_policy as string) ?? null,
   }
-}
+})

@@ -191,7 +191,7 @@ async function folderId(connection: DriveConnection, token: string): Promise<str
   // It may already exist from a previous connection; searching first avoids a
   // second folder of the same name.
   const search = new URLSearchParams({
-    q: `mimeType='${FOLDER_MIME}' and name='ComicTale AI' and trashed=false`,
+    q: `mimeType='${FOLDER_MIME}' and name='ComicAgent AI' and trashed=false`,
     fields: 'files(id)',
   })
 
@@ -207,7 +207,7 @@ async function folderId(connection: DriveConnection, token: string): Promise<str
     const created = (await fetch('https://www.googleapis.com/drive/v3/files', {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'ComicTale AI', mimeType: FOLDER_MIME }),
+      body: JSON.stringify({ name: 'ComicAgent AI', mimeType: FOLDER_MIME }),
     })
       .then((r) => r.json())
       .catch(() => ({}))) as { id?: string }

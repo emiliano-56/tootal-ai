@@ -7,8 +7,8 @@ export default function ResellerPage() {
   const router = useRouter()
 
   const features = [
-    { icon: Zap, title: "What You'll Promote", text: "ComicTale AI empowers content creators, agencies, and entrepreneurs to generate stunning comic books, animated videos, educational content, and more using advanced AI technology.", gradient: "from-blue-500 to-indigo-600" },
-    { icon: TrendingUp, title: "Why ComicTale AI?", text: "High-demand AI content tool with recurring revenue potential. Help content creators, publishers, educators, and businesses unlock unlimited creative possibilities.", gradient: "from-purple-500 to-fuchsia-600" },
+    { icon: Zap, title: "What You'll Promote", text: "ComicAgent AI empowers content creators, agencies, and entrepreneurs to generate stunning comic books, animated videos, educational content, and more using advanced AI technology.", gradient: "from-blue-500 to-indigo-600" },
+    { icon: TrendingUp, title: "Why ComicAgent AI?", text: "High-demand AI content tool with recurring revenue potential. Help content creators, publishers, educators, and businesses unlock unlimited creative possibilities.", gradient: "from-purple-500 to-fuchsia-600" },
     { icon: Award, title: "100% Commission", text: "Keep every penny from your sales. No hidden fees, no deductions. Once approved, you earn 100% on every qualified customer you bring.", gradient: "from-amber-400 to-orange-500" },
     { icon: Users, title: "Join Our Network", text: "Get your unique affiliate link through Launchpad JV. Track every referral automatically and watch your earnings grow.", gradient: "from-pink-500 to-rose-600" },
   ]
@@ -37,7 +37,7 @@ export default function ResellerPage() {
           }}
         >
           <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-5 relative z-10">
-            ComicTale AI
+            ComicAgent AI
             <span className="block bg-gradient-to-r from-white via-sky-100 to-blue-200 bg-clip-text text-transparent">
               Reseller Program
             </span>
@@ -132,7 +132,7 @@ export default function ResellerPage() {
             Ready to Start Earning?
           </h2>
           <p className="text-gray-500 mb-8 max-w-2xl mx-auto">
-            Join the ComicTale AI Reseller Program today and start building recurring revenue by sharing the most powerful AI content generation tool with your network.
+            Join the ComicAgent AI Reseller Program today and start building recurring revenue by sharing the most powerful AI content generation tool with your network.
           </p>
           <button
             onClick={() => window.open('https://launchpadjv.com', '_blank')}
@@ -145,7 +145,7 @@ export default function ResellerPage() {
         {/* Footer */}
         <div className="text-center mt-12 pt-8 border-t border-gray-200">
           <p className="text-gray-500 mb-1">Questions? We&apos;re here to help.</p>
-          <p className="text-black font-semibold">Team ComicTale AI</p>
+          <p className="text-black font-semibold">Team ComicAgent AI</p>
         </div>
       </main>
     </div>

@@ -1,7 +1,7 @@
 import { DfyLibrary } from '@/components/dfy-library'
 
 export const metadata = {
-  title: 'Done For You - ComicTale AI',
+  title: 'Done For You - ComicAgent AI',
   description: 'Ten ready-made kids content businesses, with commercial rights',
 }
 

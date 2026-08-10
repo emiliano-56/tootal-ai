@@ -1,7 +1,7 @@
 import { AnalyticsDashboard } from '@/components/analytics-dashboard'
 
 export const metadata = {
-  title: 'Analytics - ComicTale AI',
+  title: 'Analytics - ComicAgent AI',
   description: 'Track your comic, coloring and video creation activity',
 }
 

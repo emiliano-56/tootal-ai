@@ -19,7 +19,7 @@ const jakarta = Plus_Jakarta_Sans({
 })
 
 export const metadata: Metadata = {
-  title: "ComicTale AI - AI Comics & Coloring Creator",
+  title: "ComicAgent AI - AI Comics & Coloring Creator",
   description:
     "Create amazing school comics and coloring pages with AI. Perfect for kids, parents, teachers and content creators.",
 
@@ -31,17 +31,17 @@ export const metadata: Metadata = {
   },
 
   openGraph: {
-    title: "ComicTale AI",
+    title: "ComicAgent AI",
     description:
       "AI-powered comics and coloring page generator for creators and educators.",
     url: "https://your-domain.com",
-    siteName: "ComicTale AI",
+    siteName: "ComicAgent AI",
     type: "website",
   },
 
   twitter: {
     card: "summary_large_image",
-    title: "ComicTale AI",
+    title: "ComicAgent AI",
     description:
       "Create comics and coloring pages instantly with AI.",
   },

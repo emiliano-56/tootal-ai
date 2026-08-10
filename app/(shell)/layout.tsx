@@ -6,6 +6,9 @@ import { resolveGenerationBackend } from '@/lib/ai/generation-backend'
 import { EntitlementsProvider } from '@/components/entitlements-context'
 import { entitlementsFor } from '@/lib/plans/server'
 import { getSessionContext } from '@/lib/supabase/server'
+import { policyInputFor } from '@/lib/ai/policy.server'
+import { canUsePersonalKeys } from '@/lib/ai/policy'
+import { LocaleProvider } from '@/components/locale-provider'
 
 export default async function ShellLayout({
   children,
@@ -21,9 +24,14 @@ export default async function ShellLayout({
 
   // Resolved here rather than per page, so the header, sidebar and every
   // generate button read the same numbers.
-  const entitlements = session
-    ? await entitlementsFor(session.userId)
-    : { limits: {}, usage: {}, plans: [], unlocked: [] }
+  // Resolved here too, so the sidebar can hide the personal-keys screen
+  // without every page paying for a request to find out.
+  const [entitlements, personalKeys] = session
+    ? await Promise.all([
+        entitlementsFor(session.userId),
+        policyInputFor(session.userId, session.apiPolicy).then(canUsePersonalKeys),
+      ])
+    : [{ limits: {}, usage: {}, plans: [], unlocked: [] }, false]
 
   return (
     <div
@@ -35,15 +43,19 @@ export default async function ShellLayout({
       }}
     >
       <GenerationConfigProvider url={url}>
-        <EntitlementsProvider value={entitlements}>
+        <EntitlementsProvider value={{ ...entitlements, personalKeys }}>
+          <LocaleProvider>
           <MobileNavProvider>
             <Sidebar />
             <Header />
 
-            <div className="pt-16 md:pl-64 flex w-full">
+            {/* ps-, not pl-: the sidebar moves to the right in an RTL locale
+                and the content has to make room on that side instead. */}
+            <div className="pt-16 md:ps-64 flex w-full">
               <main className="flex-1 w-full min-w-0">{children}</main>
             </div>
           </MobileNavProvider>
+          </LocaleProvider>
         </EntitlementsProvider>
       </GenerationConfigProvider>
     </div>

@@ -70,11 +70,11 @@ export function AuthLayout({ portal, children }: { portal: Portal; children: Rea
           <div className="relative z-10 flex items-center gap-3">
             <img
               src="/nlogo2.png"
-              alt="ComicTale AI"
+              alt="ComicAgent AI"
               className="w-12 h-12 rounded-2xl object-cover bg-white/90 ring-1 ring-white/40 p-1"
             />
             <span className="font-display text-lg font-semibold text-white tracking-tight">
-              ComicTale AI
+              ComicAgent AI
             </span>
           </div>
 
@@ -105,7 +105,7 @@ export function AuthLayout({ portal, children }: { portal: Portal; children: Rea
                   <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
                   <span className="ml-2 text-[10px] font-semibold text-slate-500">
-                    ComicTale AI · Comic Studio
+                    ComicAgent AI · Comic Studio
                   </span>
                 </div>
 

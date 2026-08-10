@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import jsPDF from 'jspdf'
 import { Wand2, Sparkles, Download, Users, BookOpen, RotateCcw } from 'lucide-react'
 import type { ComicScript } from '@/app/api/agent/comic-script/route'
 import { renderPanelWithBubbles, type Dialogue } from '@/lib/comic/bubbles'
@@ -16,6 +15,7 @@ import {
   ErrorNote,
   StepProgress,
 } from '@/components/agent-ui'
+import { useLanguage, LanguagePicker } from '@/components/language-picker'
 
 import { useGenerationApi } from '@/components/generation-config'
 import { consumeFeature } from '@/lib/plans/use-feature'
@@ -46,6 +46,10 @@ export function StoryComicAgent() {
   const [panelsPerPage, setPanelsPerPage] = useState(4)
   const [style, setStyle] = useState('Modern comic book, bold ink, vibrant colour')
   const [audience, setAudience] = useState('All ages')
+
+  // Story, dialogue and captions follow this. The panel art prompts do not —
+  // the route keeps those English so the pictures still come out right.
+  const language = useLanguage()
 
   const [running, setRunning] = useState(false)
   const [stepIndex, setStepIndex] = useState(-1)
@@ -90,7 +94,14 @@ export function StoryComicAgent() {
       const scriptRes = await fetch('/api/agent/comic-script', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idea, pages, panelsPerPage, style, audience }),
+        body: JSON.stringify({
+          idea,
+          pages,
+          panelsPerPage,
+          style,
+          audience,
+          language: language.value,
+        }),
       })
       const scriptData = await scriptRes.json()
       if (!scriptRes.ok) throw new Error(scriptData?.error || 'Script generation failed')
@@ -196,6 +207,9 @@ export function StoryComicAgent() {
 
   const exportPdf = async () => {
     if (!script || panels.length === 0) return
+
+    // Loaded on demand — jsPDF is ~350KB and only this button needs it.
+    const { default: jsPDF } = await import('jspdf')
 
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
     const pageWidth = pdf.internal.pageSize.getWidth()
@@ -313,6 +327,12 @@ export function StoryComicAgent() {
                   className={inputClass}
                 />
               </Field>
+
+              <LanguagePicker
+                value={language.value}
+                onChange={language.setValue}
+                allowed={language.allowed}
+              />
 
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Pages">

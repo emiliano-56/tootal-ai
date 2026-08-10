@@ -4,6 +4,7 @@ import { requireFeature } from '@/lib/plans/gate'
 import { nextRunAt, FREQUENCIES, type Frequency } from '@/lib/autopilot/schedule'
 import { runCampaign, refillIdeas, type Campaign } from '@/lib/autopilot/engine'
 import { tenantSiteUrl } from '@/lib/settings/site-url.server'
+import { contentKind, ideaSource, whenPlanEnds, parsePlan } from '@/lib/autopilot/content'
 
 /**
  * Autopilot campaigns.
@@ -63,10 +64,12 @@ export async function GET(request: NextRequest) {
 
     if (!campaign) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-    const [{ data: runs }, { data: ideas }] = await Promise.all([
+    const [{ data: runs }, { data: ideas }, { data: plan }] = await Promise.all([
       supabaseAdmin
         .from('autopilot_runs')
-        .select('id, title, status, scheduled_for, started_at, finished_at, delivered_to, error, project_id')
+        .select(
+          'id, title, status, scheduled_for, started_at, finished_at, delivered_to, error, project_id, plan_day'
+        )
         .eq('campaign_id', campaignId)
         .order('created_at', { ascending: false })
         .limit(30),
@@ -77,9 +80,19 @@ export async function GET(request: NextRequest) {
         .eq('status', 'new')
         .order('score', { ascending: false })
         .limit(20),
+      supabaseAdmin
+        .from('autopilot_plan_items')
+        .select('id, day, title, prompt, used, used_at')
+        .eq('campaign_id', campaignId)
+        .order('day'),
     ])
 
-    return NextResponse.json({ campaign, runs: runs ?? [], ideas: ideas ?? [] })
+    return NextResponse.json({
+      campaign,
+      runs: runs ?? [],
+      ideas: ideas ?? [],
+      plan: plan ?? [],
+    })
   }
 
   const { data: campaigns } = await supabaseAdmin
@@ -141,6 +154,9 @@ export async function POST(request: NextRequest) {
         frequency,
         publish_hour: publishHour,
         timezone,
+        content_kind: contentKind(body.contentKind),
+        idea_source: ideaSource(body.ideaSource),
+        when_plan_ends: whenPlanEnds(body.whenPlanEnds),
         platforms: Array.isArray(body.platforms) ? body.platforms.slice(0, 8) : [],
         connection_ids: await ownedConnectionIds(gate.session.userId, body.connectionIds),
         webhook_url: String(body.webhookUrl ?? '').trim() || null,
@@ -153,7 +169,30 @@ export async function POST(request: NextRequest) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
-    return NextResponse.json({ ok: true, campaign: data })
+    const created = data as { id: string }
+
+    // The plan is written with the campaign rather than in a second request.
+    // A planned campaign that existed for even a moment with no plan would be
+    // picked up by a scheduler tick and immediately stop itself as finished.
+    const planned = parsePlan(String(body.planText ?? ''))
+
+    if (planned.items.length > 0) {
+      await supabaseAdmin.from('autopilot_plan_items').insert(
+        planned.items.map((item) => ({
+          campaign_id: created.id,
+          day: item.day,
+          title: item.title,
+          prompt: item.prompt,
+        }))
+      )
+    }
+
+    return NextResponse.json({
+      ok: true,
+      campaign: data,
+      planned: planned.items.length,
+      problems: planned.problems,
+    })
   }
 
   const campaign = await ownedCampaign(
@@ -219,6 +258,10 @@ export async function POST(request: NextRequest) {
     if (typeof body.webhookUrl === 'string') patch.webhook_url = body.webhookUrl.trim() || null
     if (typeof body.deliverEmail === 'string') patch.deliver_email = body.deliverEmail.trim() || null
 
+    if (body.contentKind !== undefined) patch.content_kind = contentKind(body.contentKind)
+    if (body.ideaSource !== undefined) patch.idea_source = ideaSource(body.ideaSource)
+    if (body.whenPlanEnds !== undefined) patch.when_plan_ends = whenPlanEnds(body.whenPlanEnds)
+
 
     if (Object.keys(patch).length === 0) {
       return NextResponse.json({ error: 'Nothing to change' }, { status: 400 })
@@ -243,6 +286,62 @@ export async function POST(request: NextRequest) {
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
     return NextResponse.json({ ok: true })
+  }
+
+  // ---- the day-by-day plan
+  //
+  // Replaced wholesale rather than merged. The screen edits the plan as one
+  // block of text, so a partial update would need a diff nobody asked for —
+  // and "what I see is what runs" is the property that makes a schedule
+  // trustworthy.
+  if (body.action === 'plan') {
+    const parsed = parsePlan(String(body.text ?? ''))
+
+    // Which days have already gone out, so replacing the plan does not repost
+    // day three to a channel that has already seen it.
+    const { data: existing } = await supabaseAdmin
+      .from('autopilot_plan_items')
+      .select('day, used, used_at, run_id')
+      .eq('campaign_id', campaign.id)
+      .eq('used', true)
+
+    const alreadyUsed = new Map(
+      ((existing ?? []) as { day: number; used_at: string; run_id: string }[]).map((row) => [
+        row.day,
+        row,
+      ])
+    )
+
+    await supabaseAdmin.from('autopilot_plan_items').delete().eq('campaign_id', campaign.id)
+
+    if (parsed.items.length > 0) {
+      const { error } = await supabaseAdmin.from('autopilot_plan_items').insert(
+        parsed.items.map((item) => {
+          const before = alreadyUsed.get(item.day)
+
+          return {
+            campaign_id: campaign.id,
+            day: item.day,
+            title: item.title,
+            prompt: item.prompt,
+            used: Boolean(before),
+            used_at: before?.used_at ?? null,
+            run_id: before?.run_id ?? null,
+          }
+        })
+      )
+
+      if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    }
+
+    return NextResponse.json({
+      ok: true,
+      saved: parsed.items.length,
+      problems: parsed.problems,
+      keptUsed: [...alreadyUsed.keys()].filter((day) =>
+        parsed.items.some((item) => item.day === day)
+      ).length,
+    })
   }
 
   // ---- run now

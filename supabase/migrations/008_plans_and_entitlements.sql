@@ -214,7 +214,7 @@ values
   ('oto1', 'Unlimited',  'Removes every monthly limit.',                      20, false, '{}', '{}', null),
   ('oto2', 'OTO 2',      'Additional tools.',                                 30, false, '{}', '{}', null),
   ('oto3', 'OTO 3',      'Additional tools.',                                 40, false, '{}', '{}', null),
-  ('oto4', 'Reseller',   'Sell Comic Tale AI under our branding.',            50, false, '{}', '{100,150}', 'reseller'),
+  ('oto4', 'Reseller',   'Sell ComicAgent AI under our branding.',            50, false, '{}', '{100,150}', 'reseller'),
   ('oto5', 'White Label','Run the platform under your own brand.',            60, false, '{}', '{15,25}', 'white_label'),
   ('mega', 'Mega Bundle','Everything from Front End through OTO 5.',          70, true,
    '{fe,oto1,oto2,oto3,oto4,oto5}', '{}', null)

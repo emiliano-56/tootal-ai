@@ -282,7 +282,7 @@ async function postReddit(connection: Connection, input: PostInput, token: strin
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         Authorization: `Bearer ${token}`,
-        'User-Agent': 'ComicTaleAI/1.0',
+        'User-Agent': 'ComicAgentAI/1.0',
       },
       body,
     })

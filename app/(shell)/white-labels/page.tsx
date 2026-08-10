@@ -37,13 +37,13 @@ export default function WhiteLabelPage() {
           }}
         >
           <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-5 relative z-10">
-            ComicTale AI
+            ComicAgent AI
             <span className="block bg-gradient-to-r from-white via-sky-100 to-blue-200 bg-clip-text text-transparent">
               White Label Panel
             </span>
           </h1>
           <p className="text-lg text-blue-50/85 max-w-2xl relative z-10">
-            Deploy ComicTale AI under your own custom domain, brand, and logos. Launch your own AI content generation platform.
+            Deploy ComicAgent AI under your own custom domain, brand, and logos. Launch your own AI content generation platform.
           </p>
         </div>
 
@@ -164,7 +164,7 @@ export default function WhiteLabelPage() {
         {/* Footer */}
         <div className="text-center mt-12 pt-8 border-t border-gray-200">
           <p className="text-gray-500 mb-1">Questions? We&apos;re here to help.</p>
-          <p className="text-black font-semibold">Team ComicTale AI</p>
+          <p className="text-black font-semibold">Team ComicAgent AI</p>
         </div>
       </main>
     </div>

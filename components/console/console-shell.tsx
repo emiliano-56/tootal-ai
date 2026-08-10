@@ -114,7 +114,7 @@ export function ConsoleShell({
 
           <div className="flex-1 min-w-0">
             <p className="font-display font-bold text-slate-900 dark:text-white text-sm truncate">
-              {tenantName || 'ComicTale AI'}
+              {tenantName || 'ComicAgent AI'}
             </p>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
               {ROLE_LABEL[role]}

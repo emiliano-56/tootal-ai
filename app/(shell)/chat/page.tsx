@@ -259,7 +259,7 @@ return (
    <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md shadow-blue-500/25">
      <MessageCircle className="w-4.5 h-4.5 text-white" />
    </div>
-   <h1 className="text-xl font-bold text-black">ComicTale Prompt Chat</h1>
+   <h1 className="text-xl font-bold text-black">ComicAgent Prompt Chat</h1>
  </div>
  </div>
 

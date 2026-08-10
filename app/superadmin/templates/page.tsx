@@ -1,7 +1,7 @@
 import { PortalGate } from '@/components/console/portal-page'
 import { TemplatesManager } from '@/components/console/templates-manager'
 
-export const metadata = { title: 'Email Templates - ComicTale AI' }
+export const metadata = { title: 'Email Templates - ComicAgent AI' }
 
 export default function Page() {
   return (

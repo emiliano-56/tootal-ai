@@ -54,11 +54,11 @@ insert into public.plans
   (code, name, description, sort_order, is_bundle, includes, seat_options, grants_role, tier, seats)
 values
   ('oto4_100', 'Reseller — 100 Licences',
-   'Sell Comic Tale AI under our branding, up to 100 accounts.',
+   'Sell ComicAgent AI under our branding, up to 100 accounts.',
    50, false, '{}', '{}', 'reseller',    'oto4', 100),
 
   ('oto4_150', 'Reseller — 150 Licences',
-   'Sell Comic Tale AI under our branding, up to 150 accounts.',
+   'Sell ComicAgent AI under our branding, up to 150 accounts.',
    51, false, '{}', '{}', 'reseller',    'oto4', 150),
 
   ('oto5_15',  'White Label — 15 Licences',

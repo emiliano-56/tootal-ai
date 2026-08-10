@@ -31,7 +31,7 @@ interface TemplateRow {
 const SAMPLE: Record<string, string> = {
   first_name: 'Alex',
   last_name: 'Kim',
-  brand_name: 'ComicTale AI',
+  brand_name: 'ComicAgent AI',
   login_url: 'https://app.example.com/login',
   reset_url: 'https://app.example.com/reset?token=abc123',
   support_email: 'support@example.com',

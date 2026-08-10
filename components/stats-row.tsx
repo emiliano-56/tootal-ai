@@ -3,11 +3,12 @@
 import { BookOpen, Palette, Video, Coins, TrendingUp } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/db'
+import { useT } from '@/components/locale-provider'
 
 const statConfig = [
   {
     key: 'comics',
-    label: 'Comics Created',
+    label: 'dash.comics',
     icon: BookOpen,
     gradient: 'from-blue-500 to-indigo-600',
     glow: 'group-hover:shadow-blue-500/20',
@@ -15,7 +16,7 @@ const statConfig = [
   },
   {
     key: 'colorings',
-    label: 'Coloring Pages',
+    label: 'dash.coloringBooks',
     icon: Palette,
     gradient: 'from-purple-500 to-fuchsia-600',
     glow: 'group-hover:shadow-purple-500/20',
@@ -23,7 +24,7 @@ const statConfig = [
   },
   {
     key: 'videos',
-    label: 'Videos Generated',
+    label: 'dash.videos',
     icon: Video,
     gradient: 'from-pink-500 to-rose-500',
     glow: 'group-hover:shadow-pink-500/20',
@@ -31,7 +32,7 @@ const statConfig = [
   },
   {
     key: 'tools',
-    label: 'Tools Unlocked',
+    label: 'dash.toolsUnlocked',
     icon: Coins,
     gradient: 'from-amber-400 to-orange-500',
     glow: 'group-hover:shadow-amber-500/20',
@@ -71,6 +72,7 @@ function AnimatedNumber({ value }: { value: number }) {
 }
 
 export function StatsRow() {
+  const t = useT()
   const [counts, setCounts] = useState({ comics: 0, colorings: 0, videos: 0, tools: 0 })
 
   useEffect(() => {
@@ -82,17 +84,21 @@ export function StatsRow() {
 
         if (!user) return
 
-        const [comicsRes, coloringsRes, videosRes, profileRes] = await Promise.all([
-          supabase.from('comics').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
-          supabase.from('colorings').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
-          supabase.storage.from('video').list(user.id),
+        // One source. Counting comics, colourings and a bucket listing
+        // separately meant the dashboard could disagree with History, with My
+        // Library and with the keep-limit all at once — and the video count
+        // listed a bucket, so it included files nothing had a row for.
+        const [libraryRes, profileRes] = await Promise.all([
+          fetch('/api/library').then((r) => r.json()).catch(() => ({ quotas: {} })),
           fetch('/api/usage').then((r) => r.json()).catch(() => ({ unlocked: [] })),
         ])
 
+        const quotas = (libraryRes as { quotas?: Record<string, { used: number }> })?.quotas ?? {}
+
         setCounts({
-          comics: comicsRes.count || 0,
-          colorings: coloringsRes.count || 0,
-          videos: videosRes.data?.filter((f) => f.id && f.name.includes('.')).length || 0,
+          comics: quotas.comic?.used ?? 0,
+          colorings: quotas.coloring?.used ?? 0,
+          videos: quotas.video?.used ?? 0,
           // Monthly allowances replaced the credit balance.
           tools: (profileRes as { unlocked?: string[] })?.unlocked?.length ?? 0,
         })
@@ -108,7 +114,7 @@ export function StatsRow() {
     <section className="mb-8">
       <div className="flex items-center gap-2 mb-4">
         <TrendingUp className="w-[18px] h-[18px] text-indigo-600" />
-        <h2 className="font-display text-lg font-semibold text-slate-900">Overview</h2>
+        <h2 className="font-display text-lg font-semibold text-slate-900">{t('dash.overview')}</h2>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -128,7 +134,7 @@ export function StatsRow() {
 
               <div className="relative flex items-start justify-between gap-2">
                 <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider leading-tight">
-                  {stat.label}
+                  {t(stat.label)}
                 </p>
                 <div
                   className={`w-10 h-10 rounded-xl bg-gradient-to-br ${stat.gradient} flex items-center justify-center shadow-lg shadow-slate-900/10 group-hover:scale-110 group-hover:-rotate-6 transition-transform duration-300 shrink-0`}

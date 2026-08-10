@@ -321,7 +321,7 @@ export async function exchangeCode(
         'Content-Type': 'application/x-www-form-urlencoded',
         Authorization: `Basic ${Buffer.from(`${app.client_id}:${app.client_secret}`).toString('base64')}`,
         // Reddit blocks requests without a distinctive user agent.
-        'User-Agent': 'ComicTaleAI/1.0',
+        'User-Agent': 'ComicAgentAI/1.0',
       },
       body: new URLSearchParams({
         grant_type: 'authorization_code',
@@ -338,7 +338,7 @@ export async function exchangeCode(
       await fetch('https://oauth.reddit.com/api/v1/me', {
         headers: {
           Authorization: `Bearer ${token.access_token}`,
-          'User-Agent': 'ComicTaleAI/1.0',
+          'User-Agent': 'ComicAgentAI/1.0',
         },
       })
     )
@@ -406,7 +406,7 @@ export async function refreshConnection(
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
       Authorization: `Basic ${Buffer.from(`${app.client_id}:${app.client_secret}`).toString('base64')}`,
-      'User-Agent': 'ComicTaleAI/1.0',
+      'User-Agent': 'ComicAgentAI/1.0',
     },
     body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: refreshToken }),
   })

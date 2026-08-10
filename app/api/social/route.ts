@@ -256,7 +256,7 @@ export async function POST(request: NextRequest) {
     if (!connection) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
     const result = await publish(connection, {
-      caption: 'Test post from ComicTale AI — your account is connected.',
+      caption: 'Test post from ComicAgent AI — your account is connected.',
       url: await siteUrl(request.nextUrl.origin),
     })
 

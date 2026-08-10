@@ -7,7 +7,7 @@ import { HOME_ROUTE, type Role } from '@/lib/auth/rbac'
  * boundary — knowing /superadmin grants nothing, because the role is still
  * checked against the database after authentication and the proxy guards the
  * console routes independently. What it does buy is a clean separation for
- * white-label customers, who should never see Comic Tale AI staff branding.
+ * white-label customers, who should never see ComicAgent AI staff branding.
  */
 
 export interface Portal {
@@ -37,7 +37,7 @@ export const PORTALS: Portal[] = [
     path: '/superadmin',
     role: 'superadmin',
     title: 'Superadmin sign in',
-    subtitle: 'Platform administration for Comic Tale AI staff.',
+    subtitle: 'Platform administration for ComicAgent AI staff.',
     badge: 'Restricted access',
     accent: 'from-slate-800 via-slate-900 to-black',
   },

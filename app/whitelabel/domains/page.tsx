@@ -3,7 +3,7 @@ import { DomainsManager } from '@/components/console/domains-manager'
 import { getSessionContext, PLATFORM_TENANT_ID } from '@/lib/supabase/server'
 import type { Role } from '@/lib/auth/rbac'
 
-export const metadata = { title: 'Domains - ComicTale AI' }
+export const metadata = { title: 'Domains - ComicAgent AI' }
 
 export default async function Page() {
   const session = await getSessionContext()

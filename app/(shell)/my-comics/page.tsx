@@ -288,27 +288,19 @@ export default function MyComicsPage() {
 
       setDeleting(pdfPath)
 
-      // DELETE FROM STORAGE
-      const { error: storageError } = await supabase.storage
-        .from("comic-pdfs")
-        .remove([pdfPath])
+      // Deleting goes through the library API, which removes the file, the
+      // library row and the legacy comics row together. Doing it here meant
+      // the library row survived — History kept showing the comic, and it
+      // still counted against the keep limit, so clearing space cleared none.
+      const response = await fetch(`/api/library/by-path?path=${encodeURIComponent(pdfPath)}`, {
+        method: "DELETE",
+      })
 
-      if (storageError) {
-        console.log("[v0] Error deleting from storage:", storageError)
-        alert("Failed to delete PDF")
-        setDeleting(null)
-        return
-      }
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}))
 
-      // DELETE FROM DATABASE
-      const { error: dbError } = await supabase
-        .from("comics")
-        .delete()
-        .eq("pdf_path", pdfPath)
-
-      if (dbError) {
-        console.log("[v0] Error deleting from database:", dbError)
-        alert("Failed to delete comic record")
+        console.log("[my-comics] delete failed:", payload)
+        alert(payload.error ?? "Failed to delete")
         setDeleting(null)
         return
       }

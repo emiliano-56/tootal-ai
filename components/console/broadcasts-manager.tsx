@@ -296,7 +296,7 @@ function ComposeDialog({
     () =>
       renderTemplate(bodyHtml, {
         first_name: 'Alex',
-        brand_name: 'ComicTale AI',
+        brand_name: 'ComicAgent AI',
         email: 'alex@example.com',
       }),
     [bodyHtml]

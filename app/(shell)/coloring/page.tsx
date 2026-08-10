@@ -2,8 +2,6 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import jsPDF from "jspdf"
-import html2canvas from "html2canvas"
 import toast from "react-hot-toast"
 import {
   Palette,
@@ -23,12 +21,17 @@ import { UsageBadge } from '@/components/usage-badge'
 import { usePromptPrefill } from '@/lib/dfy/use-prefill'
 import { uploadCover } from '@/lib/share/cover'
 import { useLibrarySave } from '@/components/use-library-save'
+import { useLanguage, LanguagePicker } from '@/components/language-picker'
+import { promptDirective } from '@/lib/i18n/languages'
 
 export default function Page() {
   const API = useGenerationApi()
 
   // The keep-limit, the full-library dialog and Drive backup all live here.
   const library = useLibrarySave()
+
+  // What language the story comes out in.
+  const language = useLanguage()
 
 
   const router = useRouter()
@@ -105,7 +108,17 @@ export default function Page() {
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify(form)
+        // Same as the comic generator: `final_prompt` is handed straight to
+        // the image model, so it stays English while everything the reader
+        // sees follows the chosen language.
+        body: JSON.stringify({
+          ...form,
+          book_idea:
+            form.book_idea +
+            promptDirective(language.value, {
+              keepEnglish: ['final_prompt', 'scene_description'],
+            }),
+        })
       })
 
       const data = await res.json()
@@ -225,6 +238,13 @@ export default function Page() {
     try {
 
       const elements = document.querySelectorAll(".coloring-page-export")
+
+      // Over half a megabyte between them, needed only when this button is
+      // pressed. Static imports put all of it in the page's initial bundle.
+      const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
+        import("jspdf"),
+        import("html2canvas"),
+      ])
 
       const pdf = new jsPDF({
         orientation: "portrait",
@@ -529,6 +549,14 @@ export default function Page() {
                 className="w-full h-40 rounded-2xl bg-white border border-gray-200 p-4 outline-none resize-vertical text-black text-sm focus:border-purple-500 focus:ring-2 focus:ring-purple-100 transition-colors"
               />
             </div>
+
+            {/* Next to the idea rather than in a settings panel: it changes
+                what you get back, so it belongs where you say what you want. */}
+            <LanguagePicker
+              value={language.value}
+              onChange={language.setValue}
+              allowed={language.allowed}
+            />
 
             {/* STYLE PICKER */}
             <div>

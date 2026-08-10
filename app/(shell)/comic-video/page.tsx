@@ -2,7 +2,7 @@ import { ComicVideoStudio } from '@/components/comic-video-studio'
 import { UsageBadge } from '@/components/usage-badge'
 
 export const metadata = {
-  title: 'Comic-to-Video - ComicTale AI',
+  title: 'Comic-to-Video - ComicAgent AI',
   description: 'Animate comic pages into a video with camera moves and captions',
 }
 

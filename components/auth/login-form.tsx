@@ -74,7 +74,7 @@ export function LoginForm({ portal }: { portal: Portal }) {
     <div className="relative w-full max-w-[400px] animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both">
       {/* Mobile logo */}
       <div className="lg:hidden text-center mb-8">
-        <img src="/nlogo2.png" alt="ComicTale AI" className="w-20 h-20 mx-auto rounded-2xl object-cover" />
+        <img src="/nlogo2.png" alt="ComicAgent AI" className="w-20 h-20 mx-auto rounded-2xl object-cover" />
         <p className="font-display mt-3 text-sm font-semibold text-slate-500">
           Create, Launch, Inspire.
         </p>
@@ -179,7 +179,7 @@ export function LoginForm({ portal }: { portal: Portal }) {
 
       {!isStaffPortal && (
         <p className="mt-7 text-center text-[13px] text-slate-500">
-          New to ComicTale AI?{' '}
+          New to ComicAgent AI?{' '}
           <Link href="/signup" className="font-semibold text-indigo-600 hover:text-indigo-700 transition-colors">
             Create an account
           </Link>

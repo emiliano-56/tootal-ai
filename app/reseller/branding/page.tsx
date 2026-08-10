@@ -1,7 +1,7 @@
 import { PortalGate } from '@/components/console/portal-page'
 import { ComingSoon } from '@/components/console/console-sections'
 
-export const metadata = { title: 'Brand - ComicTale AI' }
+export const metadata = { title: 'Brand - ComicAgent AI' }
 
 export default function Page() {
   return (

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { completeJson, AiError } from '@/lib/ai/deepseek'
+import { promptDirective } from '@/lib/i18n/languages'
 
 /** Marketing Content Agent — every promo asset for a product, in one pass. */
 
@@ -43,6 +44,9 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => null)
 
+  // Empty for English, so the existing prompt is unchanged.
+  const language = String(body?.language ?? 'en')
+
     const product = String(body?.product ?? '').trim()
     const audience = String(body?.audience ?? '').trim()
     const niche = String(body?.niche ?? '').trim()
@@ -53,7 +57,7 @@ export async function POST(request: NextRequest) {
     }
 
     const output = await completeJson<MarketingOutput>({
-      system: SYSTEM,
+      system: SYSTEM + promptDirective(language),
       prompt: [
         `Product: ${product}`,
         audience && `Target audience: ${audience}`,

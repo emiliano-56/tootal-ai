@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { completeJson, AiError } from '@/lib/ai/deepseek'
+import { promptDirective } from '@/lib/i18n/languages'
 
 /**
  * Prompt Enhancer agent.
@@ -52,6 +53,9 @@ Return JSON exactly like:
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => null)
+
+    // Empty for English, so the existing prompt is unchanged.
+    const language = String(body?.language ?? 'en')
     const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : ''
     const style = typeof body?.style === 'string' ? body.style.trim() : ''
 
@@ -67,7 +71,10 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await completeJson<EnhanceResult>({
-      system: SYSTEM,
+      // The whole point of this agent is the prompt itself, which the image
+      // model reads — so that one field stays English. The `added` phrases are
+      // shown to the customer as "what was added", and those do translate.
+      system: SYSTEM + promptDirective(language, { keepEnglish: ['enhanced'] }),
       prompt: style
         ? `Prompt: ${prompt}\nPreferred art style: ${style}`
         : `Prompt: ${prompt}`,

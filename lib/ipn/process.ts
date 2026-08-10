@@ -274,7 +274,7 @@ async function handleSale(
   if (created) {
     const result = await sendTemplate(settings.welcome_template, parsed.email, {
       first_name: parsed.firstName,
-      brand_name: 'ComicTale AI',
+      brand_name: 'ComicAgent AI',
       login_url: `${origin || process.env.NEXT_PUBLIC_SITE_URL || ""}/login`,
       email: parsed.email,
       password,

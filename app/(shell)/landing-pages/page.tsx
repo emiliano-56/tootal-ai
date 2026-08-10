@@ -2,7 +2,7 @@ import { LandingBuilder } from '@/components/landing-builder'
 import { UsageBadge } from '@/components/usage-badge'
 
 export const metadata = {
-  title: 'Landing Page Builder - ComicTale AI',
+  title: 'Landing Page Builder - ComicAgent AI',
   description: 'Generate a complete sales page for any product',
 }
 

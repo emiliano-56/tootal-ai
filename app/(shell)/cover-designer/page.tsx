@@ -2,7 +2,7 @@ import { CoverDesigner } from '@/components/cover-designer'
 import { UsageBadge } from '@/components/usage-badge'
 
 export const metadata = {
-  title: 'Cover Designer - ComicTale AI',
+  title: 'Cover Designer - ComicAgent AI',
   description: 'Design front and back comic book covers with AI',
 }
 

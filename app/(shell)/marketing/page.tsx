@@ -2,7 +2,7 @@ import { MarketingGenerator } from '@/components/marketing-generator'
 import { UsageBadge } from '@/components/usage-badge'
 
 export const metadata = {
-  title: 'Marketing Agent - ComicTale AI',
+  title: 'Marketing Agent - ComicAgent AI',
   description: 'Generate ads, social posts, emails, blog and SEO copy',
 }
 

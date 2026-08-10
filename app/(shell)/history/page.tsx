@@ -1,7 +1,7 @@
 import { AgentHistory } from '@/components/agent-history'
 
 export const metadata = {
-  title: 'History - ComicTale AI',
+  title: 'History - ComicAgent AI',
   description: 'Every AI agent run you have made',
 }
 

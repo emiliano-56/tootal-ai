@@ -17,6 +17,7 @@ import { useEffect, useRef, useState } from 'react'
 import { supabase, signOut } from '@/lib/db'
 import { useMobileNav } from '@/components/mobile-nav-context'
 import { usePlanLabel } from '@/components/entitlements-context'
+import { LocaleSwitcher } from '@/components/locale-switcher'
 
 export function Header() {
   const { open: openMobileNav } = useMobileNav()
@@ -188,7 +189,7 @@ export function Header() {
   }
 
   return (
-    <header className="fixed top-0 right-0 left-0 md:left-64 bg-white border-b border-gray-200 h-16 z-[1000]">
+    <header className="fixed top-0 end-0 start-0 md:start-64 bg-white border-b border-gray-200 h-16 z-[1000]">
     <style>{`
         @keyframes pulse-green {
           0%, 100% {
@@ -224,6 +225,10 @@ export function Header() {
 
         {/* Right Side */}
         <div className="flex items-center gap-4">
+
+          {/* Interface language. Sits before the plan badge so it reads as a
+              setting for the whole app rather than an account detail. */}
+          <LocaleSwitcher />
 
           {/* Current plan */}
           <div className="hidden sm:flex items-center gap-2 px-4 py-2 bg-white rounded-lg">

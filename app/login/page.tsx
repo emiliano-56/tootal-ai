@@ -5,7 +5,7 @@ import { getPortal } from '@/lib/auth/portals'
 const portal = getPortal('login')!
 
 export const metadata = {
-  title: `${portal.title} - ComicTale AI`,
+  title: `${portal.title} - ComicAgent AI`,
 }
 
 export default function Page() {

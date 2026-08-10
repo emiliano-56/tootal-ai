@@ -1,7 +1,6 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import jsPDF from 'jspdf'
 import { ImagePlus, Sparkles, Download, Loader2, QrCode } from 'lucide-react'
 import type { CoverCopy } from '@/app/api/agent/cover-copy/route'
 import { loadImage } from '@/lib/comic/bubbles'
@@ -16,6 +15,7 @@ import {
   ErrorNote,
   StepProgress,
 } from '@/components/agent-ui'
+import { useLanguage, LanguagePicker } from '@/components/language-picker'
 
 import { useGenerationApi } from '@/components/generation-config'
 import { consumeFeature } from '@/lib/plans/use-feature'
@@ -69,6 +69,10 @@ export function CoverDesigner() {
   const [idea, setIdea] = useState('')
   const [author, setAuthor] = useState('')
   const [genre, setGenre] = useState('')
+
+  // The title and blurb are what the reader sees, so they follow the language.
+  // The art prompt stays English — the image model is trained on it.
+  const language = useLanguage()
 
   const [running, setRunning] = useState(false)
   const [stepIndex, setStepIndex] = useState(-1)
@@ -326,7 +330,7 @@ export function CoverDesigner() {
       const res = await fetch('/api/agent/cover-copy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idea, author, genre }),
+        body: JSON.stringify({ idea, author, genre, language: language.value }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error || 'Copy generation failed')
@@ -377,8 +381,11 @@ export function CoverDesigner() {
     }
   }
 
-  const exportPdf = () => {
+  const exportPdf = async () => {
     if (!front || !back || !copy) return
+
+    // Loaded on demand — jsPDF is ~350KB and only this button needs it.
+    const { default: jsPDF } = await import('jspdf')
 
     // Full wrap: back | spine | front
     const totalW = W * 2 + SPINE_W
@@ -460,6 +467,13 @@ export function CoverDesigner() {
                   className={inputClass}
                 />
               </Field>
+
+              <LanguagePicker
+                value={language.value}
+                onChange={language.setValue}
+                allowed={language.allowed}
+                className="mb-4"
+              />
 
               <PrimaryButton
                 onClick={run}

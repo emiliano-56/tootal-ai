@@ -53,7 +53,7 @@ create table if not exists public.tenants (
   licence_note   text,
 
   -- White-label branding. Ignored for reseller tenants, which must use
-  -- Comic Tale AI branding per the product rules.
+  -- ComicAgent AI branding per the product rules.
   brand_name     text,
   logo_url       text,
   favicon_url    text,
@@ -79,7 +79,7 @@ create index if not exists tenants_status_idx on public.tenants (status);
 
 -- The platform tenant is fixed so superadmin-created users always have a home.
 insert into public.tenants (id, type, name, slug, seat_limit)
-values ('00000000-0000-0000-0000-000000000001', 'platform', 'Comic Tale AI', 'platform', null)
+values ('00000000-0000-0000-0000-000000000001', 'platform', 'ComicAgent AI', 'platform', null)
 on conflict (id) do nothing;
 
 

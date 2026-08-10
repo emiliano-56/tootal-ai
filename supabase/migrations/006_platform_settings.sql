@@ -101,7 +101,7 @@ values
    'Shown to users and used as the reply-to on transactional email.',
    'general', 'text', null),
 
-  ('platform_name', '"ComicTale AI"'::jsonb, 'Platform name',
+  ('platform_name', '"ComicAgent AI"'::jsonb, 'Platform name',
    'Used in email templates and the default branding.', 'general', 'text', null)
 on conflict (key) do nothing;
 

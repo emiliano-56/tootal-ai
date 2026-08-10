@@ -147,7 +147,7 @@ function ImageUpload({
  *
  * Backed by the tenant row. A database check constraint restricts branding to
  * white-label tenants, so a reseller saving here is rejected by Postgres — the
- * product rule that resellers sell under Comic Tale AI branding is enforced
+ * product rule that resellers sell under ComicAgent AI branding is enforced
  * below the UI, not just by hiding the menu item.
  */
 
@@ -226,7 +226,7 @@ export function BrandingManager({ tenantId }: { tenantId: string }) {
     if (writeError) {
       setError(
         writeError.message.includes('tenants_branding_not_reseller')
-          ? 'Resellers cannot rebrand — they sell under Comic Tale AI branding.'
+          ? 'Resellers cannot rebrand — they sell under ComicAgent AI branding.'
           : writeError.message
       )
     } else {
@@ -283,7 +283,7 @@ export function BrandingManager({ tenantId }: { tenantId: string }) {
           <div className="bg-white dark:bg-slate-900 rounded-2xl ring-1 ring-slate-200/70 dark:ring-slate-800 p-5 space-y-4">
             <SectionHeading title="Identity" />
 
-            <Field label="Product name" hint="Replaces “ComicTale AI” across the members area">
+            <Field label="Product name" hint="Replaces “ComicAgent AI” across the members area">
               <input
                 value={draft.brand_name ?? ''}
                 onChange={(e) => set('brand_name', e.target.value)}

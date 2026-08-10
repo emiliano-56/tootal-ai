@@ -8,6 +8,16 @@ import { nextRunAt, type Frequency } from '@/lib/autopilot/schedule'
 import { publishAll, loadConnections } from '@/lib/social/publish'
 import { createShare, shareLink } from '@/lib/share/links'
 import { renderPreview, coverPromptFor } from '@/lib/ai/images'
+import {
+  contentKind,
+  featureFor,
+  drawsArtwork,
+  ideaSource,
+  whenPlanEnds,
+  decideNext,
+  CONTENT_KINDS,
+  type ContentKind,
+} from '@/lib/autopilot/content'
 
 /**
  * Producing one episode, unattended.
@@ -45,6 +55,10 @@ export interface Campaign {
   last_run_at: string | null
   total_runs: number
   created_at: string
+  /** Null on a campaign made before migration 023 — all of those are comics. */
+  content_kind?: string | null
+  idea_source?: string | null
+  when_plan_ends?: string | null
 }
 
 export interface Idea {
@@ -53,6 +67,11 @@ export interface Idea {
   hook: string
   angle: string | null
   score: number
+  /** Set only for a planned day: the brief the customer wrote themselves. */
+  prompt?: string
+  /** The plan row this came from, so the run can be traced back to its day. */
+  planItemId?: string
+  planDay?: number
 }
 
 // ---------------------------------------------------------------------------
@@ -143,8 +162,8 @@ export async function refillIdeas(campaign: Campaign, count = 6): Promise<number
   return drafts.length
 }
 
-/** The best unused idea, generating more if the queue has run dry. */
-async function nextIdea(campaign: Campaign): Promise<Idea | null> {
+/** The best unused AI idea, generating more if the queue has run dry. */
+async function nextAiIdea(campaign: Campaign): Promise<Idea | null> {
   const pick = async () => {
     const { data } = await supabaseAdmin
       .from('autopilot_ideas')
@@ -167,6 +186,73 @@ async function nextIdea(campaign: Campaign): Promise<Idea | null> {
   return pick()
 }
 
+interface PlanRow {
+  id: string
+  day: number
+  title: string
+  prompt: string
+  used: boolean
+}
+
+/**
+ * What this run should make.
+ *
+ * A planned campaign takes the next day the customer wrote. When the plan runs
+ * out, `when_plan_ends` decides — and the default is to stop, because
+ * continuing would post something under a campaign the customer believed had
+ * finished. `null` means stop, with the reason recorded on the run.
+ */
+async function nextIdea(campaign: Campaign): Promise<{ idea: Idea | null; reason?: string }> {
+  const source = ideaSource(campaign.idea_source)
+
+  if (source === 'ai') return { idea: await nextAiIdea(campaign) }
+
+  const { data } = await supabaseAdmin
+    .from('autopilot_plan_items')
+    .select('id, day, title, prompt, used')
+    .eq('campaign_id', campaign.id)
+    .order('day')
+
+  const plan = (data ?? []) as PlanRow[]
+
+  const decision = decideNext({
+    source,
+    plan: plan.map((row) => ({ day: row.day, used: row.used })),
+    whenEnds: whenPlanEnds(campaign.when_plan_ends),
+  })
+
+  if (decision.action === 'stop') return { idea: null, reason: decision.reason }
+
+  if (decision.action === 'use_ai') return { idea: await nextAiIdea(campaign) }
+
+  // Repeating: every day is used, so the flags are cleared before day one is
+  // taken again. Done here rather than in the pure decision so that function
+  // stays free of side effects.
+  if (plan.every((row) => row.used)) {
+    await supabaseAdmin
+      .from('autopilot_plan_items')
+      .update({ used: false, used_at: null, run_id: null })
+      .eq('campaign_id', campaign.id)
+  }
+
+  const item = plan.find((row) => row.day === decision.day)
+
+  if (!item) return { idea: null, reason: 'The planned day went missing.' }
+
+  return {
+    idea: {
+      id: item.id,
+      title: item.title || item.prompt.slice(0, 120),
+      hook: item.prompt.slice(0, 500),
+      angle: null,
+      score: 100,
+      prompt: item.prompt,
+      planItemId: item.id,
+      planDay: item.day,
+    },
+  }
+}
+
 // ---------------------------------------------------------------------------
 //  The episode
 // ---------------------------------------------------------------------------
@@ -184,18 +270,70 @@ export interface EpisodeScript {
 }
 
 /**
+ * The brief for each kind of thing a campaign can post.
+ *
+ * All four return the same JSON shape on purpose. Delivery, the share page,
+ * the project row and the history screen all read `pages[].panels[].caption`
+ * and `post.caption`, and giving each kind its own shape would mean four
+ * versions of every one of those. What changes is the instruction, which is
+ * the part that actually differs.
+ */
+const BRIEF: Record<ContentKind, string> = {
+  comic: `You write short comic episodes for children.
+
+Six pages, two panels each. Every image_prompt must stand alone — it is sent to
+an image model that has not read the rest — and must restate the character's
+appearance every time, word for word from the character list.
+
+Captions are read aloud by a parent. Short sentences. No dialogue tags.`,
+
+  coloring: `You design colouring-book pages for children.
+
+Six pages, ONE panel each — a colouring page is a single drawing, not a strip.
+
+Every image_prompt must ask for clean black outlines on pure white, no shading,
+no grey, no colour and thick lines a child can colour inside. State that every
+time; an image model that is not told will return a full-colour illustration.
+
+The caption is the one line printed under the drawing. Keep it to a few words.`,
+
+  post: `You write social posts for a children's comic brand.
+
+ONE page with ONE panel: a single image and a single caption. This is a post,
+not a story, and padding it into six pages wastes the customer's allowance on
+artwork nobody asked for.
+
+The image_prompt is for the post's picture. The post caption is the thing that
+has to earn the scroll — write that properly and keep the hashtags relevant.`,
+
+  video: `You write short narrated video scripts for a children's comic brand.
+
+Six pages, one panel each — each one is a shot. The caption is what the
+narrator SAYS over that shot, so write it to be read aloud: short sentences,
+natural rhythm, no stage directions.
+
+image_prompt describes what is on screen for that shot. Nothing is rendered
+from it here, so it can be a description rather than a full prompt.`,
+}
+
+/**
  * Write one episode.
  *
  * The series bible goes in whole and comes back updated, so episode nine has
  * the same cast as episode one. That consistency is the difference between a
  * series and a pile of unrelated comics.
+ *
+ * A planned idea carries the customer's own prompt, and it goes in as the
+ * instruction rather than as a hint. Somebody who wrote out thirty days wants
+ * day twelve to be what they wrote, not the model's improvement on it.
  */
 export async function writeEpisode(campaign: Campaign, idea: Idea): Promise<EpisodeScript> {
   const bible = campaign.series_bible ?? {}
   const cast = (bible.characters as { name: string; appearance: string }[] | undefined) ?? []
+  const kind = contentKind(campaign.content_kind)
 
   return completeJson<EpisodeScript>({
-    system: `You write short comic episodes for children.
+    system: `${BRIEF[kind]}
 
 Return JSON exactly as:
 {
@@ -204,25 +342,23 @@ Return JSON exactly as:
   "characters": [{ "name": "", "appearance": "detailed and unchanging" }],
   "pages": [{ "page_number": 1, "scene_summary": "", "panels": [{ "panel_number": 1, "image_prompt": "", "caption": "" }] }],
   "post": { "caption": "for social media", "hashtags": ["", ""] }
-}
-
-Six pages, two panels each. Every image_prompt must stand alone — it is sent to
-an image model that has not read the rest — and must restate the character's
-appearance every time, word for word from the character list.
-
-Captions are read aloud by a parent. Short sentences. No dialogue tags.`,
+}`,
     prompt: `Series: ${campaign.name}
 Niche: ${campaign.niche}
 Audience: ${campaign.audience}
 Tone: ${campaign.tone}
 Art style for every image prompt: ${campaign.art_style}
 
-${cast.length > 0 ? `Existing cast — keep these EXACTLY as described:\n${cast.map((c) => `${c.name}: ${c.appearance}`).join('\n')}` : 'This is episode one. Invent a small cast and describe each one precisely enough to redraw.'}
+${cast.length > 0 ? `Existing cast — keep these EXACTLY as described:\n${cast.map((c) => `${c.name}: ${c.appearance}`).join('\n')}` : 'This is the first one. Invent a small cast and describe each one precisely enough to redraw.'}
 
-This episode:
+This one:
 Title idea: ${idea.title}
 Hook: ${idea.hook}
-${idea.angle ? `Angle: ${idea.angle}` : ''}`,
+${idea.angle ? `Angle: ${idea.angle}` : ''}${
+      idea.prompt
+        ? `\n\nThe customer wrote this brief themselves. Follow it — do not replace it with a better idea of your own:\n${idea.prompt}`
+        : ''
+    }`,
     temperature: 0.8,
     maxTokens: 4000,
   })
@@ -433,23 +569,53 @@ export async function runCampaign(campaign: Campaign, origin = ''): Promise<RunR
   }
 
   try {
-    // The episode is a comic, so it costs a comic. Anyone who owns OTO 3 owns
-    // OTO 1 and is unlimited, but the accounting has to be honest either way.
-    const spend = await consumeFeature(campaign.user_id, 'comic')
+    const kind = contentKind(campaign.content_kind)
+    const kindLabel = CONTENT_KINDS.find((entry) => entry.kind === kind)?.label ?? kind
+
+    // Charged against the allowance for what it actually makes. A colouring
+    // campaign spending the comic allowance is how a customer runs out of the
+    // wrong thing and cannot see why.
+    const spend = await consumeFeature(campaign.user_id, featureFor(kind))
 
     if (!spend.ok) {
-      return (await fail(spend.error ?? 'Monthly comic allowance is gone', 'skipped')) as RunResult
+      return (await fail(
+        spend.error ?? `Monthly ${kindLabel.toLowerCase()} allowance is gone`,
+        'skipped'
+      )) as RunResult
     }
 
-    const idea = await nextIdea(campaign)
+    const { idea, reason } = await nextIdea(campaign)
 
-    if (!idea) return (await fail('Could not come up with an idea', 'skipped')) as RunResult
+    if (!idea) {
+      // A finished plan is not a failure, and marking it as one would fill the
+      // history with red rows for a campaign that did exactly what was asked.
+      // The campaign is paused so the scheduler stops picking it up.
+      if (reason) {
+        await supabaseAdmin
+          .from('autopilot_campaigns')
+          .update({ status: 'complete' })
+          .eq('id', campaign.id)
+
+        return (await fail(reason, 'skipped')) as RunResult
+      }
+
+      return (await fail('Could not come up with an idea', 'skipped')) as RunResult
+    }
 
     const script = await writeEpisode(campaign, idea)
 
     if (!script?.title) return (await fail('The episode came back empty')) as RunResult
 
-    await supabaseAdmin.from('autopilot_ideas').update({ status: 'used' }).eq('id', idea.id)
+    // Mark whichever queue it came from. A planned day is marked before the
+    // artwork so a failure later cannot serve the same day twice.
+    if (idea.planItemId) {
+      await supabaseAdmin
+        .from('autopilot_plan_items')
+        .update({ used: true, used_at: new Date().toISOString(), run_id: runId })
+        .eq('id', idea.planItemId)
+    } else {
+      await supabaseAdmin.from('autopilot_ideas').update({ status: 'used' }).eq('id', idea.id)
+    }
 
     // A project row so the episode shows up in My Comics with everything else.
     const { data: project } = await supabaseAdmin
@@ -471,7 +637,10 @@ export async function runCampaign(campaign: Campaign, origin = ''): Promise<RunR
     // book would time out halfway and leave a part-written row.
     let coverUrl: string | null = null
 
-    if ((campaign.render_panels ?? 1) > 0) {
+    // A video script renders nothing — it is a shot list to record against —
+    // so skipping the image saves the customer a generation and the run a
+    // round trip to the backend.
+    if (drawsArtwork(kind) && (campaign.render_panels ?? 1) > 0) {
       coverUrl = await renderPreview(
         campaign.user_id,
         coverPromptFor(
@@ -491,7 +660,11 @@ export async function runCampaign(campaign: Campaign, origin = ''): Promise<RunR
         status: 'done',
         title: script.title,
         script,
-        idea_id: idea.id,
+        // A planned day has no row in autopilot_ideas, so the foreign key
+        // would not resolve — it is recorded on the plan columns instead.
+        idea_id: idea.planItemId ? null : idea.id,
+        plan_item_id: idea.planItemId ?? null,
+        plan_day: idea.planDay ?? null,
         project_id: (project as { id: string } | null)?.id ?? null,
         cover_url: coverUrl,
         delivered_to: delivered,

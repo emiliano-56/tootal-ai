@@ -215,7 +215,7 @@ export async function POST(request: NextRequest) {
   if (replaceId) {
     const { data: victim } = await supabaseAdmin
       .from('library_items')
-      .select('id, title, kind, bucket, path, public_url, drive_file_id')
+      .select('id, user_id, title, kind, bucket, path, public_url, drive_file_id')
       .eq('id', replaceId)
       .eq('user_id', session.userId)
       .maybeSingle()
@@ -224,6 +224,7 @@ export async function POST(request: NextRequest) {
 
     const row = victim as {
       id: string
+      user_id: string
       title: string
       kind: string
       bucket: string | null
@@ -292,11 +293,27 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ ok: true, item: created, backedUp })
 }
 
-/** Remove the row and the file behind it. */
+/**
+ * Remove the row, the file, and the legacy row that shadows it.
+ *
+ * Comics and colouring books each still have a table of their own from before
+ * the library existed. Deleting in one place and not the other is how the two
+ * drift apart, and the symptoms are both bad:
+ *
+ *   - Delete in My Comics and the library row survives. History shows a card
+ *     whose file is gone, and — worse — it still counts against the keep
+ *     limit, so clearing space does not actually clear any.
+ *   - Delete in History and the legacy row survives, so My Comics lists a
+ *     comic whose download 404s.
+ *
+ * Every delete now goes through here, so there is one path and no drift.
+ */
 async function removeItem(row: {
   id: string
   bucket: string | null
   path: string | null
+  user_id?: string
+  kind?: string
 }): Promise<void> {
   if (row.bucket && row.path) {
     const { error } = await supabaseAdmin.storage.from(row.bucket).remove([row.path])
@@ -304,6 +321,21 @@ async function removeItem(row: {
     // A missing object should not block the row from going: the outcome the
     // customer asked for is that it stops taking up a slot.
     if (error) console.error('[library] could not remove the file:', error.message)
+  }
+
+  // The legacy table, matched on the path — which is what both rows carry.
+  const legacy = row.kind === 'comic' ? 'comics' : row.kind === 'coloring' ? 'colorings' : null
+
+  if (legacy && row.path && row.user_id) {
+    const { error } = await supabaseAdmin
+      .from(legacy)
+      .delete()
+      .eq('pdf_path', row.path)
+      .eq('user_id', row.user_id)
+
+    // The table may not exist on a fresh install, and a missing legacy row is
+    // the state we wanted anyway.
+    if (error) console.error(`[library] legacy ${legacy} row:`, error.message)
   }
 
   await supabaseAdmin.from('library_items').delete().eq('id', row.id)
@@ -320,14 +352,16 @@ export async function DELETE(request: NextRequest) {
 
   const { data } = await supabaseAdmin
     .from('library_items')
-    .select('id, bucket, path')
+    .select('id, user_id, kind, bucket, path')
     .eq('id', id)
     .eq('user_id', session.userId)
     .maybeSingle()
 
   if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  await removeItem(data as { id: string; bucket: string | null; path: string | null })
+  await removeItem(
+    data as { id: string; user_id: string; kind: string; bucket: string | null; path: string | null }
+  )
 
   return NextResponse.json({ ok: true })
 }

@@ -1,4 +1,4 @@
-# Database Setup — ComicTale AI
+# Database Setup — ComicAgent AI
 
 Everything runs on **Supabase** (PostgreSQL + Auth + Storage).
 No other database is needed.

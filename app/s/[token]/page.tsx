@@ -34,7 +34,7 @@ export async function generateMetadata({
   const image =
     share.previewUrl ?? (looksLikeImage(share.url) ? (share.url as string) : undefined)
 
-  const description = share.item.caption || `Made with ComicTale AI`
+  const description = share.item.caption || `Made with ComicAgent AI`
 
   return {
     title: share.item.title,
@@ -154,7 +154,7 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
             href="/"
             className="inline-flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 hover:text-indigo-600"
           >
-            Made with <span className="font-bold text-indigo-600">ComicTale AI</span>
+            Made with <span className="font-bold text-indigo-600">ComicAgent AI</span>
           </Link>
         </footer>
       </div>

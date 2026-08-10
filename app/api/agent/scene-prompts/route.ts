@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { completeJson, AiError } from '@/lib/ai/deepseek'
+import { promptDirective } from '@/lib/i18n/languages'
 
 /**
  * Turns comic pages into short cinematic video prompts.
@@ -29,6 +30,9 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => null)
 
+    // Empty for English, so the existing prompt is unchanged.
+    const language = String(body?.language ?? 'en')
+
     const pages: string[] = Array.isArray(body?.pages) ? body.pages : []
     const story = String(body?.story ?? '').trim()
     const style = String(body?.style ?? 'cinematic comic book').trim()
@@ -43,7 +47,9 @@ export async function POST(request: NextRequest) {
     const count = Math.min(Math.max(pages.length || 5, 1), 20)
 
     const result = await completeJson<ScenePromptResult>({
-      system: SYSTEM,
+      // The caption is burned onto the screen and must be readable; the prompt
+      // goes to the video model and must not be.
+      system: SYSTEM + promptDirective(language, { keepEnglish: ['prompt'] }),
       prompt: [
         story && `Story: ${story}`,
         `Art style: ${style}`,

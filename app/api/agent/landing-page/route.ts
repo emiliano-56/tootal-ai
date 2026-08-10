@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { completeJson, AiError } from '@/lib/ai/deepseek'
+import { promptDirective } from '@/lib/i18n/languages'
 
 /** Landing Page Builder — structured sections, kept editable after generation. */
 
@@ -67,6 +68,9 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => null)
 
+  // Empty for English, so the existing prompt is unchanged.
+  const language = String(body?.language ?? 'en')
+
     const product = String(body?.product ?? '').trim()
     const audience = String(body?.audience ?? '').trim()
     const price = String(body?.price ?? '').trim()
@@ -76,7 +80,7 @@ export async function POST(request: NextRequest) {
     }
 
     const config = await completeJson<LandingConfig>({
-      system: SYSTEM,
+      system: SYSTEM + promptDirective(language),
       prompt: [
         `Product: ${product}`,
         audience && `Audience: ${audience}`,

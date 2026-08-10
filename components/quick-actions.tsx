@@ -2,12 +2,13 @@
 
 import { useRouter } from 'next/navigation'
 import { BookOpen, Palette, FolderOpen, ArrowRight, Zap } from 'lucide-react'
+import { useT } from '@/components/locale-provider'
 
 const actions = [
   {
     icon: BookOpen,
-    title: 'Create New Comic',
-    subtitle: 'Write a story and generate full comic panels',
+    title: 'dash.newComic.title',
+    subtitle: 'dash.newComic.subtitle',
     href: '/comic',
     gradient: 'from-blue-500 to-indigo-600',
     ring: 'hover:ring-blue-300',
@@ -15,8 +16,8 @@ const actions = [
   },
   {
     icon: Palette,
-    title: 'Design Coloring Book',
-    subtitle: 'Turn any story into printable coloring pages',
+    title: 'dash.coloring.title',
+    subtitle: 'dash.coloring.subtitle',
     href: '/coloring',
     gradient: 'from-purple-500 to-fuchsia-600',
     ring: 'hover:ring-purple-300',
@@ -24,8 +25,8 @@ const actions = [
   },
   {
     icon: FolderOpen,
-    title: 'Manage My Library',
-    subtitle: 'View, edit and download your creations',
+    title: 'dash.library.title',
+    subtitle: 'dash.library.subtitle',
     href: '/my-comics',
     gradient: 'from-pink-500 to-rose-600',
     ring: 'hover:ring-pink-300',
@@ -35,6 +36,7 @@ const actions = [
 
 export function QuickActions() {
   const router = useRouter()
+  const t = useT()
 
   return (
     <section className="mb-8">
@@ -48,7 +50,9 @@ export function QuickActions() {
 
       <div className="flex items-center gap-2 mb-4">
         <Zap className="w-[18px] h-[18px] text-indigo-600" />
-        <h2 className="font-display text-lg font-semibold text-slate-900">Quick Actions</h2>
+        <h2 className="font-display text-lg font-semibold text-slate-900">
+          {t('dash.quickActions')}
+        </h2>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -72,8 +76,10 @@ export function QuickActions() {
               </div>
 
               <div className="relative flex-1 min-w-0">
-                <p className="font-display font-semibold text-slate-900 text-[15px]">{action.title}</p>
-                <p className="text-xs text-slate-500 mt-1 leading-snug">{action.subtitle}</p>
+                <p className="font-display font-semibold text-slate-900 text-[15px]">
+                  {t(action.title)}
+                </p>
+                <p className="text-xs text-slate-500 mt-1 leading-snug">{t(action.subtitle)}</p>
               </div>
 
               <div

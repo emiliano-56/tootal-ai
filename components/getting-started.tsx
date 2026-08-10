@@ -3,30 +3,32 @@
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Sparkles, PenLine, Palette, Download } from 'lucide-react'
+import { useT } from '@/components/locale-provider'
 
 const steps = [
   {
     icon: PenLine,
-    title: 'Describe Your Story',
-    subtitle: 'Tell the AI what school adventure you want to tell',
+    title: 'start.step1.title',
+    subtitle: 'start.step1.subtitle',
     gradient: 'from-blue-500 to-indigo-600',
   },
   {
     icon: Palette,
-    title: 'Choose an Art Style',
-    subtitle: 'Comic cartoon, anime, watercolor and more',
+    title: 'start.step2.title',
+    subtitle: 'start.step2.subtitle',
     gradient: 'from-purple-500 to-fuchsia-600',
   },
   {
     icon: Download,
-    title: 'Generate & Download',
-    subtitle: 'Get a print-ready comic or coloring book instantly',
+    title: 'start.step3.title',
+    subtitle: 'start.step3.subtitle',
     gradient: 'from-pink-500 to-rose-600',
   },
 ]
 
 export function GettingStarted() {
   const router = useRouter()
+  const t = useT()
 
   return (
     <div className="relative overflow-hidden bg-white rounded-2xl p-6 h-full flex flex-col ring-1 ring-slate-200/70 shadow-[0_2px_8px_-2px_rgba(15,23,42,0.06)] animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both">
@@ -36,7 +38,9 @@ export function GettingStarted() {
         <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
           <Sparkles className="w-[18px] h-[18px] text-white" />
         </div>
-        <h3 className="font-display font-semibold text-slate-900 text-[17px]">Getting Started Guide</h3>
+        <h3 className="font-display font-semibold text-slate-900 text-[17px]">
+          {t('start.heading')}
+        </h3>
       </div>
 
       <div className="relative flex-1 z-10">
@@ -57,10 +61,12 @@ export function GettingStarted() {
 
                 <div className="flex-1 min-w-0 pt-1.5">
                   <p className="font-semibold text-slate-900 text-sm flex items-center gap-2">
-                    {step.title}
+                    {t(step.title)}
                     <Icon className="w-3.5 h-3.5 text-slate-400" />
                   </p>
-                  <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{step.subtitle}</p>
+                  <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
+                    {t(step.subtitle)}
+                  </p>
                 </div>
               </div>
             )
@@ -72,7 +78,7 @@ export function GettingStarted() {
         onClick={() => router.push('/comic')}
         className="font-display w-full mt-6 h-12 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-[15px] font-semibold shadow-lg shadow-indigo-500/25 hover:-translate-y-0.5 transition-all relative z-10"
       >
-        Start Creating Now
+        {t('start.cta')}
       </Button>
     </div>
   )

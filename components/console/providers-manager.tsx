@@ -15,6 +15,8 @@ import {
   ConfirmDialog,
   type Column,
 } from '@/components/console/console-ui'
+import { AudioProvidersPanel } from '@/components/console/audio-providers-panel'
+import { PersonalKeysNote } from '@/components/console/personal-keys-note'
 
 /**
  * AI provider credentials.
@@ -415,6 +417,10 @@ export function ProvidersManager() {
           emptyMessage="No backend configured — the app falls back to NEXT_PUBLIC_API_URL."
         />
       </div>
+
+      <AudioProvidersPanel />
+
+      <PersonalKeysNote />
 
       {(addingProvider || editing) && (
         <CredentialDialog

@@ -2,7 +2,7 @@ import { PromptStudio } from '@/components/prompt-studio'
 import { UsageBadge } from '@/components/usage-badge'
 
 export const metadata = {
-  title: 'Prompt Studio - ComicTale AI',
+  title: 'Prompt Studio - ComicAgent AI',
   description: 'Ready-made comic prompts and an AI prompt enhancer',
 }
 

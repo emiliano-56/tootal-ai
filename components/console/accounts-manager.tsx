@@ -14,6 +14,7 @@ import {
   ConfirmDialog,
   type Column,
 } from '@/components/console/console-ui'
+import { POLICY_MODES, toPolicyMode, policyLabel } from '@/lib/ai/policy'
 
 /**
  * Account management, shared by all three consoles.
@@ -30,6 +31,8 @@ interface AccountRow {
   role: Role
   status: string
   created_at: string | null
+  /** Null on a schema older than migration 003. */
+  api_policy: string | null
 }
 
 type PendingAction =
@@ -87,7 +90,7 @@ export function AccountsManager({
     const [{ data, error: queryError }, { data: planRows }, { data: ownedRows }] = await Promise.all([
       supabase
         .from('profiles')
-        .select('id, email, username, role, status, created_at')
+        .select('id, email, username, role, status, created_at, api_policy')
         .in('role', roles)
         .order('created_at', { ascending: false }),
       supabase.from('plans').select('id, code, name, is_bundle').order('sort_order'),
@@ -197,6 +200,22 @@ export function AccountsManager({
     }
   }
 
+  /**
+   * Which keys this account may run on.
+   *
+   * Takes effect on their next generation — nothing is cached per user, so
+   * there is no window where the console and the runtime disagree.
+   */
+  const setApiPolicy = async (row: AccountRow, policy: string) => {
+    const ok = await call({
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: row.id, action: 'api_policy', policy }),
+    })
+
+    if (ok) setNotice(`${row.email} — AI keys set to “${policyLabel(toPolicyMode(policy))}”.`)
+  }
+
   const resetPassword = async (row: AccountRow) => {
     const input = window.prompt(`New password for ${row.email} (min 8 characters)`)
 
@@ -267,6 +286,31 @@ export function AccountsManager({
         sortValue: (row) => row.status,
         render: (row) => <StatusPill value={row.status} />,
       },
+      // Only for whoever manages the provider keys. A reseller who can suspend
+      // their users must not be able to point them at their own AI billing.
+      ...(can(actorRole, 'apis.manage')
+        ? [
+            {
+              key: 'api_policy',
+              header: 'AI keys',
+              sortValue: (row: AccountRow) => row.api_policy ?? '',
+              render: (row: AccountRow) => (
+                <select
+                  value={toPolicyMode(row.api_policy)}
+                  onChange={(event) => setApiPolicy(row, event.target.value)}
+                  aria-label={`AI key policy for ${row.email}`}
+                  className="h-8 px-2 rounded-lg bg-slate-50 dark:bg-slate-800 ring-1 ring-slate-200 dark:ring-slate-700 text-xs text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  {POLICY_MODES.map((mode) => (
+                    <option key={mode.value} value={mode.value}>
+                      {mode.label}
+                    </option>
+                  ))}
+                </select>
+              ),
+            } satisfies Column<AccountRow>,
+          ]
+        : []),
       {
         key: 'created',
         header: 'Created',

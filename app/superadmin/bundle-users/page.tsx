@@ -3,7 +3,7 @@ import { AccountsManager } from '@/components/console/accounts-manager'
 import { getSessionContext } from '@/lib/supabase/server'
 import type { Role } from '@/lib/auth/rbac'
 
-export const metadata = { title: 'Bundle Users - ComicTale AI' }
+export const metadata = { title: 'Bundle Users - ComicAgent AI' }
 
 export default async function Page() {
   const session = await getSessionContext()

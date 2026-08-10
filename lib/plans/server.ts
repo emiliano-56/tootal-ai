@@ -29,7 +29,39 @@ export interface AccountEntitlements {
   unlocked: string[]
 }
 
+/**
+ * The plan catalogue, cached for a minute.
+ *
+ * Two queries on every single page render, for rows that change when the
+ * platform owner edits a plan — which is roughly never. The cache is module
+ * scope and holds no per-user data: it is the price list, identical for
+ * everyone, so there is nothing here that could leak between accounts.
+ *
+ * A minute rather than forever so an edit in the console shows up without a
+ * redeploy, and `clearCatalogueCache` makes it immediate for the screen that
+ * did the editing.
+ */
+let catalogueCache: { plans: Plan[]; at: number } | null = null
+
+const CATALOGUE_TTL_MS = 60_000
+
+export function clearCatalogueCache(): void {
+  catalogueCache = null
+}
+
 async function loadCatalogue(): Promise<Plan[]> {
+  if (catalogueCache && Date.now() - catalogueCache.at < CATALOGUE_TTL_MS) {
+    return catalogueCache.plans
+  }
+
+  const plans = await fetchCatalogue()
+
+  catalogueCache = { plans, at: Date.now() }
+
+  return plans
+}
+
+async function fetchCatalogue(): Promise<Plan[]> {
   const [{ data: planRows }, { data: featureRows }] = await Promise.all([
     supabaseAdmin
       .from('plans')

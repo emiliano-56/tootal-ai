@@ -53,7 +53,7 @@ export default function SupportPage() {
         </div>
 
         <footer className="mt-16 text-sm text-gray-500">
-          © 2026 ComicTale AI. All rights reserved.
+          © 2026 ComicAgent AI. All rights reserved.
         </footer>
       </div>
     </main>

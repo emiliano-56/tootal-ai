@@ -1,6 +1,9 @@
 import 'server-only'
 
 import { resolveCredentials, logApiUsage } from '@/lib/ai/credentials'
+import { policyFor } from '@/lib/ai/policy.server'
+import { getSessionContext } from '@/lib/supabase/server'
+import type { ApiPolicyMode } from '@/lib/services/api-routing'
 
 /**
  * Shared server-side LLM client.
@@ -40,11 +43,41 @@ export class AiError extends Error {
   }
 }
 
+/**
+ * Whose keys this request may use.
+ *
+ * Resolved here rather than passed down from each route, so personal keys work
+ * everywhere at once instead of only in the handful of agents somebody
+ * remembered to thread a user id through. The session read is best-effort: a
+ * cron job or an IPN callback has no cookies, and the right answer for those is
+ * the platform's own keys rather than an error.
+ */
+async function callerPolicy(): Promise<{ userId?: string; policy: ApiPolicyMode }> {
+  try {
+    const session = await getSessionContext()
+
+    if (!session) return { policy: 'platform_only' }
+
+    // The override rides along on the session, so this costs one cached
+    // settings read rather than another query per generation.
+    return {
+      userId: session.userId,
+      policy: await policyFor(session.userId, session.apiPolicy),
+    }
+  } catch {
+    // Reading cookies outside a request context throws. Falling back rather
+    // than failing keeps background work running.
+    return { policy: 'platform_only' }
+  }
+}
+
 async function callDeepseek(
   messages: ChatMessage[],
   { temperature = 0.7, maxTokens = 2000, json = false }: Omit<CompleteOptions, 'prompt' | 'system'>
 ): Promise<string> {
-  const credentials = await resolveCredentials('deepseek')
+  const { userId, policy } = await callerPolicy()
+
+  const credentials = await resolveCredentials('deepseek', { userId, policy })
 
   if (credentials.length === 0) {
     throw new AiError(

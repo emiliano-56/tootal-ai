@@ -16,9 +16,23 @@ export interface EntitlementsValue {
   usage: Record<string, number>
   plans: { code: string; name: string }[]
   unlocked: string[]
+  /**
+   * Whether this account may run generation on its own AI key.
+   *
+   * Carried here rather than fetched, because the only consumer is the sidebar
+   * — and a nav item that costs a request to decide whether to render is a
+   * request on every single page load.
+   */
+  personalKeys?: boolean
 }
 
-const EMPTY: EntitlementsValue = { limits: {}, usage: {}, plans: [], unlocked: [] }
+const EMPTY: EntitlementsValue = {
+  limits: {},
+  usage: {},
+  plans: [],
+  unlocked: [],
+  personalKeys: false,
+}
 
 const EntitlementsContext = createContext<EntitlementsValue>(EMPTY)
 

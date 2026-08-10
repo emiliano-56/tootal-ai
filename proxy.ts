@@ -62,8 +62,34 @@ function isPublicRoute(pathname: string) {
   )
 }
 
+/**
+ * Routes with no session to check and none to refresh.
+ *
+ * Worth separating from `PUBLIC_PREFIXES`, which also holds pages a signed-in
+ * visitor may reach. These four never involve a logged-in user at all:
+ *
+ *   /api/ipn              the payment processor, authenticated by shared secret
+ *   /api/cron             the scheduler, likewise
+ *   /api/social/callback  identifies the customer from a signed `state`
+ *   /s                    a share link, opened by strangers and by every
+ *                         social network's preview crawler
+ *
+ * Returning before any Supabase work saves two network round trips on each —
+ * one of them to the auth service, not the database. On a share link that is
+ * most of the response time, and a post doing well is a lot of crawler hits.
+ */
+const NO_SESSION_PREFIXES = ['/api/ipn', '/api/cron', '/api/social/callback', '/s']
+
+function needsNoSession(pathname: string) {
+  return NO_SESSION_PREFIXES.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`)
+  )
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
+
+  if (needsNoSession(pathname)) return NextResponse.next({ request })
 
   // Keep the refreshed auth cookies on whatever response we return.
   let response = NextResponse.next({ request })

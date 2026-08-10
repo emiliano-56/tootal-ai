@@ -9,7 +9,6 @@ import {
   Users,
   PaletteIcon,
   Coins,
-  Layers,
   HelpCircle,
   ImagePlus,
   ArrowUpCircle,
@@ -28,6 +27,7 @@ import {
   Package,
   Bot,
   Share2,
+  KeyRound,
 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
@@ -38,7 +38,13 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/db'
 import { useMobileNav } from '@/components/mobile-nav-context'
 import { useEntitlements } from '@/components/entitlements-context'
+import { useT } from '@/components/locale-provider'
 
+/**
+ * `label` is a catalogue key rather than the text itself, so the nav
+ * translates. The badges deliberately are not: "NEW" and "OTO 2" are the same
+ * in every language, and "OTO 2" is a product name besides.
+ */
 interface MenuItem {
   icon: typeof Home
   label: string
@@ -53,59 +59,58 @@ interface MenuGroup {
 
 const menuGroups: MenuGroup[] = [
   {
-    items: [{ icon: Home, label: 'Dashboard', href: '/dashboard' }],
+    items: [{ icon: Home, label: 'nav.dashboard', href: '/dashboard' }],
   },
   {
-    heading: 'AI Agents',
+    heading: 'nav.group.agents',
     items: [
-      { icon: Rocket, label: 'Business Agent', href: '/business-agent', badge: 'NEW' },
-      { icon: Wand2, label: 'Story to Comic', href: '/comic-agent', badge: 'NEW' },
-      { icon: Film, label: 'Comic to Video', href: '/comic-video', badge: 'NEW' },
-      { icon: ImagePlus, label: 'Cover Designer', href: '/cover-designer', badge: 'NEW' },
-      { icon: Globe, label: 'Landing Pages', href: '/landing-pages', badge: 'NEW' },
-      { icon: Megaphone, label: 'Marketing', href: '/marketing', badge: 'NEW' },
-      { icon: Sparkles, label: 'Prompt Studio', href: '/prompt-studio', badge: 'NEW' },
+      { icon: Rocket, label: 'nav.businessAgent', href: '/business-agent', badge: 'NEW' },
+      { icon: Wand2, label: 'nav.storyToComic', href: '/comic-agent', badge: 'NEW' },
+      { icon: Film, label: 'nav.comicToVideo', href: '/comic-video', badge: 'NEW' },
+      { icon: ImagePlus, label: 'nav.coverDesigner', href: '/cover-designer', badge: 'NEW' },
+      { icon: Globe, label: 'nav.landingPages', href: '/landing-pages', badge: 'NEW' },
+      { icon: Megaphone, label: 'nav.marketing', href: '/marketing', badge: 'NEW' },
+      { icon: Sparkles, label: 'nav.promptStudio', href: '/prompt-studio', badge: 'NEW' },
     ],
   },
   // What OTO 2 and OTO 3 buy. Given a heading of their own rather than being
   // filed under Library, because each is the whole reason its tier exists —
   // buried in a list they would look like another bonus.
   {
-    heading: 'Done For You',
+    heading: 'nav.group.dfy',
     items: [
-      { icon: Package, label: 'DFY Businesses', href: '/dfy-business', badge: 'OTO 2' },
-      { icon: Bot, label: 'Autopilot', href: '/autopilot', badge: 'OTO 3' },
+      { icon: Package, label: 'nav.dfyBusinesses', href: '/dfy-business', badge: 'OTO 2' },
+      { icon: Bot, label: 'nav.autopilot', href: '/autopilot', badge: 'OTO 3' },
       // Not gated: sharing by hand is for everyone, and only Autopilot needs
       // the connections to be automatic.
-      { icon: Share2, label: 'Connections', href: '/connections' },
+      { icon: Share2, label: 'nav.connections', href: '/connections' },
     ],
   },
   {
-    heading: 'Create',
+    heading: 'nav.group.create',
     items: [
-      { icon: BookOpen, label: 'Comic Generator', href: '/comic' },
-      { icon: PaletteIcon, label: 'Coloring Book', href: '/coloring' },
-      { icon: Video, label: 'Video Generator', href: '/video' },
-      { icon: ImagePlus, label: 'Book Cover', href: '/cover' },
-      { icon: Users, label: 'Generate Prompt', href: '/chat' },
+      { icon: BookOpen, label: 'nav.comicGenerator', href: '/comic' },
+      { icon: PaletteIcon, label: 'nav.coloringBook', href: '/coloring' },
+      { icon: Video, label: 'nav.videoGenerator', href: '/video' },
+      { icon: ImagePlus, label: 'nav.bookCover', href: '/cover' },
+      { icon: Users, label: 'nav.generatePrompt', href: '/chat' },
     ],
   },
   {
-    heading: 'Library',
+    heading: 'nav.group.library',
     items: [
-      { icon: FolderOpen, label: 'My Comics', href: '/my-comics' },
-      { icon: History, label: 'History', href: '/history', badge: 'NEW' },
-      { icon: BarChart3, label: 'Analytics', href: '/analytics' },
-      { icon: Layers, label: 'DFY Content Packs', href: '/dfy-prompts' },
+      { icon: FolderOpen, label: 'nav.myComics', href: '/my-comics' },
+      { icon: History, label: 'nav.history', href: '/history', badge: 'NEW' },
+      { icon: BarChart3, label: 'nav.analytics', href: '/analytics' },
     ],
   },
   {
-    heading: 'Account',
+    heading: 'nav.group.account',
     items: [
-      { icon: Coins, label: 'My Plan', href: '/credits' },
-      { icon: BadgeDollarSign, label: 'Reseller', href: '/reseller-program' },
-      { icon: ShieldCheck, label: 'White Label', href: '/white-labels' },
-      { icon: HelpCircle, label: 'Support', href: '/support' },
+      { icon: Coins, label: 'nav.myPlan', href: '/credits' },
+      { icon: BadgeDollarSign, label: 'nav.reseller', href: '/reseller-program' },
+      { icon: ShieldCheck, label: 'nav.whiteLabel', href: '/white-labels' },
+      { icon: HelpCircle, label: 'nav.support', href: '/support' },
     ],
   },
 ]
@@ -113,7 +118,26 @@ const menuGroups: MenuGroup[] = [
 export function Sidebar() {
   const pathname = usePathname()
   const { isOpen, close } = useMobileNav()
-  const { limits } = useEntitlements()
+  const { limits, personalKeys } = useEntitlements()
+  const t = useT()
+
+  // Only when the platform owner has switched personal keys on. A screen that
+  // says "nothing to set up" is worse than no screen: it invites a customer to
+  // go looking for a setting that does not exist for them.
+  const groups = personalKeys
+    ? menuGroups.map((group) =>
+        group.heading === 'nav.group.account'
+          ? {
+              ...group,
+              items: [
+                ...group.items.slice(0, 1),
+                { icon: KeyRound, label: 'nav.myAiKeys', href: '/api-keys' },
+                ...group.items.slice(1),
+              ],
+            }
+          : group
+      )
+    : menuGroups
 
   const [userPlan, setUserPlan] = useState('')
 
@@ -213,22 +237,27 @@ export function Sidebar() {
 
    <aside
      className={cn(
-       'flex flex-col w-64 bg-white border-r border-gray-200 h-screen fixed left-0 top-0 z-[1100] md:z-40 transition-transform duration-300 ease-out md:translate-x-0',
-       isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
+       // Logical properties, not physical: in Arabic, Hebrew, Urdu and Persian
+       // the whole shell flips, and a sidebar pinned to `left` would sit on
+       // top of the content instead of beside it. `border-e` and `start-0`
+       // follow the writing direction; the closed transform has to be spelled
+       // out per direction because translate-x has no logical form.
+       'flex flex-col w-64 bg-white border-e border-gray-200 h-screen fixed start-0 top-0 z-[1100] md:z-40 transition-transform duration-300 ease-out md:translate-x-0',
+       isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full rtl:translate-x-full'
      )}
    >
   {/* Logo */}
   <div className="p-6 border-b border-gray-200 flex items-center gap-3">
     <img
       src="/nlogo2.png"
-      alt="ComicTale AI Logo"
+      alt="ComicAgent AI Logo"
       className="w-10 h-10 rounded-full object-cover"
     />
 
     <div className="flex-1 min-w-0">
-      <h1 className="font-bold text-black text-sm">ComicTale AI</h1>
+      <h1 className="font-bold text-black text-sm">ComicAgent AI</h1>
       <p className="text-xs text-gray-500">
-        Create, Launch, Inspire.
+        {t('nav.tagline')}
       </p>
     </div>
 
@@ -236,7 +265,7 @@ export function Sidebar() {
     <button
       type="button"
       onClick={close}
-      aria-label="Close menu"
+      aria-label={t('nav.closeMenu')}
       className="md:hidden -mr-2 p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"
     >
       <X className="w-5 h-5" />
@@ -245,11 +274,11 @@ export function Sidebar() {
 
   {/* Menu */}
   <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-4">
-    {menuGroups.map((group, gi) => (
+    {groups.map((group, gi) => (
       <div key={gi} className="space-y-0.5">
         {group.heading && (
           <p className="px-3 pb-1.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-            {group.heading}
+            {t(group.heading)}
           </p>
         )}
 
@@ -276,12 +305,12 @@ export function Sidebar() {
             >
               <Icon className="w-[18px] h-[18px] shrink-0" />
 
-              <span className="flex-1 text-left truncate">{item.label}</span>
+              <span className="flex-1 text-left truncate">{t(item.label)}</span>
 
               {locked && (
                 <Lock
                   className="w-3.5 h-3.5 shrink-0 opacity-60"
-                  aria-label="Not included in your plan"
+                  aria-label={t('nav.lockedHint')}
                 />
               )}
 

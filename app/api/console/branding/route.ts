@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error: updateError.message.includes('tenants_branding_not_reseller')
-          ? 'Resellers cannot rebrand — they sell under Comic Tale AI branding.'
+          ? 'Resellers cannot rebrand — they sell under ComicAgent AI branding.'
           : updateError.message,
       },
       { status: 400 }

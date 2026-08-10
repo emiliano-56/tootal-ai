@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { completeJson, AiError } from '@/lib/ai/deepseek'
+import { promptDirective } from '@/lib/i18n/languages'
 
 /**
  * Story-to-Comic Agent — the writing half.
@@ -64,6 +65,9 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => null)
 
+  // Empty for English, so the existing prompt is unchanged.
+  const language = String(body?.language ?? 'en')
+
     const idea = String(body?.idea ?? '').trim()
     const pages = Math.min(Math.max(Number(body?.pages ?? 4), 1), 12)
     const panelsPerPage = Math.min(Math.max(Number(body?.panelsPerPage ?? 4), 1), 6)
@@ -76,7 +80,12 @@ export async function POST(request: NextRequest) {
     }
 
     const script = await completeJson<ComicScript>({
-      system: SYSTEM,
+      // Story, dialogue and captions translate. `image_prompt` and the
+      // character `appearance` both go to the image model, so both stay
+      // English — otherwise the art stops matching the story it illustrates.
+      system: SYSTEM + promptDirective(language, {
+        keepEnglish: ['image_prompt', 'appearance'],
+      }),
       prompt: `Idea: ${idea}
 Art style: ${style}
 Audience: ${audience}

@@ -15,6 +15,7 @@ import {
   DownloadButton,
   ErrorNote,
 } from '@/components/agent-ui'
+import { useLanguage, LanguagePicker } from '@/components/language-picker'
 
 const TABS = [
   { key: 'ads', label: 'Ads', icon: Megaphone },
@@ -31,6 +32,9 @@ export function MarketingGenerator() {
   const [audience, setAudience] = useState('')
   const [niche, setNiche] = useState('')
   const [price, setPrice] = useState('')
+
+  // What language the copy comes out in.
+  const language = useLanguage()
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -58,7 +62,7 @@ export function MarketingGenerator() {
       const res = await fetch('/api/agent/marketing', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ product, audience, niche, price }),
+        body: JSON.stringify({ product, audience, niche, price, language: language.value }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error || 'Generation failed')
@@ -182,6 +186,12 @@ export function MarketingGenerator() {
               className={inputClass}
             />
           </Field>
+
+          <LanguagePicker
+            value={language.value}
+            onChange={language.setValue}
+            allowed={language.allowed}
+          />
         </div>
 
         <div className="mt-5 flex items-center gap-3">

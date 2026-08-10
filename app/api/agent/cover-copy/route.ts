@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { completeJson, AiError } from '@/lib/ai/deepseek'
+import { promptDirective } from '@/lib/i18n/languages'
 
 /** Cover Designer — the copy half (title, subtitle, blurb, art direction). */
 
@@ -35,6 +36,9 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => null)
 
+  // Empty for English, so the existing prompt is unchanged.
+  const language = String(body?.language ?? 'en')
+
     const idea = String(body?.idea ?? '').trim()
     const author = String(body?.author ?? '').trim()
     const genre = String(body?.genre ?? '').trim()
@@ -44,7 +48,9 @@ export async function POST(request: NextRequest) {
     }
 
     const copy = await completeJson<CoverCopy>({
-      system: SYSTEM,
+      // Title, tagline and blurb are what a buyer reads, so they translate.
+      // The art prompt is read by the image model and stays English.
+      system: SYSTEM + promptDirective(language, { keepEnglish: ['art_prompt'] }),
       prompt: [`Book: ${idea}`, genre && `Genre: ${genre}`, author && `Author: ${author}`]
         .filter(Boolean)
         .join('\n'),

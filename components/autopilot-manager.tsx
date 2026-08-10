@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
   ArrowLeft,
@@ -16,11 +16,19 @@ import {
   RefreshCw,
   Rocket,
   Trash2,
+  Upload,
   Webhook,
   XCircle,
   Zap,
 } from 'lucide-react'
 import { FREQUENCIES, describeNextRun, runsPerMonth, type Frequency } from '@/lib/autopilot/schedule'
+import {
+  CONTENT_KINDS,
+  parsePlan,
+  type ContentKind,
+  type IdeaSource,
+  type WhenPlanEnds,
+} from '@/lib/autopilot/content'
 import { network } from '@/lib/social/networks'
 
 /**
@@ -233,6 +241,133 @@ export function AutopilotManager() {
           busy={busy === 'create'}
         />
       )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+//  The day-by-day plan
+// ---------------------------------------------------------------------------
+
+const PLAN_EXAMPLE = `1. Meet Pip | A shy hedgehog moves to a new burrow
+2. The lost mitten | Pip finds a mitten in the snow and looks for its owner
+3. First day at school | Pip is nervous about the first day
+Snow day — everyone builds a fort together`
+
+/**
+ * Writing out what each day should be.
+ *
+ * One text box rather than a row-per-day builder. A customer with a thirty-day
+ * plan already has it written down somewhere — in a doc, a spreadsheet, a
+ * notes app — and the fastest path from there to here is paste. A builder
+ * would make them retype thirty rows to enter data they already had.
+ *
+ * Parsed as they type so the numbering and any bad lines are visible before
+ * they commit, rather than surfacing as a failed run three weeks later.
+ */
+function PlanEditor({
+  text,
+  onChange,
+  whenEnds,
+  onWhenEndsChange,
+}: {
+  text: string
+  onChange: (value: string) => void
+  whenEnds: WhenPlanEnds
+  onWhenEndsChange: (value: WhenPlanEnds) => void
+}) {
+  const fileRef = useRef<HTMLInputElement>(null)
+  const parsed = useMemo(() => parsePlan(text), [text])
+
+  const importFile = async (file: File) => {
+    const content = await file.text()
+
+    // Appended, not replaced: importing a second list should add to the first,
+    // and silently discarding what was already typed would be worse than a
+    // duplicate the customer can see and delete.
+    onChange(text.trim() ? `${text.trim()}\n${content}` : content)
+  }
+
+  return (
+    <div className="rounded-xl ring-1 ring-slate-200 dark:ring-slate-700 p-4 space-y-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[13px] font-semibold text-slate-700 dark:text-slate-300">
+            Your plan — one line per day
+          </p>
+          <p className="text-[11px] text-slate-400 mt-0.5">
+            <code className="text-slate-500">1. Title | prompt</code>, or just paste the prompts and
+            they will be numbered in order. Tabs and CSV from a spreadsheet work too.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          className="shrink-0 h-8 px-3 rounded-lg ring-1 ring-slate-200 dark:ring-slate-700 text-[11px] font-semibold text-slate-600 dark:text-slate-300 inline-flex items-center gap-1.5"
+        >
+          <Upload className="w-3 h-3" />
+          Import
+        </button>
+
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".txt,.csv,.tsv,.md"
+          hidden
+          onChange={(event) => {
+            const file = event.target.files?.[0]
+
+            if (file) importFile(file)
+            event.target.value = ''
+          }}
+        />
+      </div>
+
+      <textarea
+        value={text}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={PLAN_EXAMPLE}
+        spellCheck={false}
+        className="w-full h-40 rounded-xl bg-slate-50 dark:bg-slate-800 ring-1 ring-slate-200 dark:ring-slate-700 p-3 text-sm text-slate-900 dark:text-white font-mono outline-none resize-y focus:ring-2 focus:ring-cyan-500 placeholder:text-slate-400"
+      />
+
+      {parsed.items.length > 0 && (
+        <p className="text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold">
+          {parsed.items.length} day{parsed.items.length === 1 ? '' : 's'} planned — first is “
+          {parsed.items[0].title}”
+        </p>
+      )}
+
+      {/* Shown per line rather than as a count: "3 problems" is not something
+          anyone can act on, and the line number is the whole fix. */}
+      {parsed.problems.length > 0 && (
+        <div className="rounded-lg bg-amber-50 dark:bg-amber-500/10 p-2.5 space-y-1">
+          {parsed.problems.slice(0, 5).map((problem) => (
+            <p key={problem.line} className="text-[11px] text-amber-700 dark:text-amber-400">
+              <span className="font-semibold">Line {problem.line}</span> — {problem.reason}:{' '}
+              <span className="opacity-70">{problem.text.slice(0, 60)}</span>
+            </p>
+          ))}
+          {parsed.problems.length > 5 && (
+            <p className="text-[11px] text-amber-600">
+              and {parsed.problems.length - 5} more
+            </p>
+          )}
+        </div>
+      )}
+
+      <Field label="When the plan runs out">
+        <select
+          value={whenEnds}
+          onChange={(event) => onWhenEndsChange(event.target.value as WhenPlanEnds)}
+          className={inputClass}
+        >
+          <option value="stop">Stop the campaign</option>
+          <option value="repeat">Start again from day 1</option>
+          <option value="continue_with_ai">Let the AI carry on inventing</option>
+        </select>
+      </Field>
     </div>
   )
 }
@@ -579,6 +714,10 @@ function CreateDialog({
 }) {
   const [name, setName] = useState('')
   const [niche, setNiche] = useState('')
+  const [contentKindValue, setContentKind] = useState<ContentKind>('comic')
+  const [ideaSourceValue, setIdeaSource] = useState<IdeaSource>('ai')
+  const [whenEnds, setWhenEnds] = useState<WhenPlanEnds>('stop')
+  const [planText, setPlanText] = useState('')
   const [audience, setAudience] = useState('Children aged 4-8')
   const [artStyle, setArtStyle] = useState(ART_STYLES[0])
   const [tone, setTone] = useState('Warm and playful')
@@ -624,6 +763,92 @@ function CreateDialog({
         </div>
 
         <div className="p-5 space-y-5">
+          {/* What it makes. Asked first because it changes what everything
+              below means — and because a campaign that quietly produced the
+              wrong kind of thing was the single biggest gap here. */}
+          <Field label="What should it post?">
+            <div className="grid sm:grid-cols-2 gap-2">
+              {CONTENT_KINDS.map((entry) => {
+                const active = entry.kind === contentKindValue
+
+                return (
+                  <button
+                    key={entry.kind}
+                    type="button"
+                    onClick={() => setContentKind(entry.kind)}
+                    className={`p-3 rounded-xl text-left ring-1 transition-colors ${
+                      active
+                        ? 'ring-cyan-500 bg-cyan-50 dark:bg-cyan-500/10'
+                        : 'ring-slate-200 dark:ring-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <p
+                      className={`text-sm font-semibold ${active ? 'text-cyan-900 dark:text-cyan-200' : 'text-slate-900 dark:text-white'}`}
+                    >
+                      {entry.label}
+                    </p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                      {entry.description}
+                    </p>
+                  </button>
+                )
+              })}
+            </div>
+          </Field>
+
+          {/* Where each day's idea comes from. */}
+          <Field label="Where do the ideas come from?">
+            <div className="grid sm:grid-cols-2 gap-2">
+              {(
+                [
+                  {
+                    value: 'ai' as const,
+                    label: 'Let the AI decide',
+                    hint: 'It invents a fresh idea for every run, keeps the cast consistent and never repeats itself. Set it up once and leave it.',
+                  },
+                  {
+                    value: 'planned' as const,
+                    label: 'I will plan each day',
+                    hint: 'Paste or import your own list. Day 1 runs first, day 2 next, and so on — exactly what you wrote.',
+                  },
+                ]
+              ).map((option) => {
+                const active = option.value === ideaSourceValue
+
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setIdeaSource(option.value)}
+                    className={`p-3 rounded-xl text-left ring-1 transition-colors ${
+                      active
+                        ? 'ring-cyan-500 bg-cyan-50 dark:bg-cyan-500/10'
+                        : 'ring-slate-200 dark:ring-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <p
+                      className={`text-sm font-semibold ${active ? 'text-cyan-900 dark:text-cyan-200' : 'text-slate-900 dark:text-white'}`}
+                    >
+                      {option.label}
+                    </p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                      {option.hint}
+                    </p>
+                  </button>
+                )
+              })}
+            </div>
+          </Field>
+
+          {ideaSourceValue === 'planned' && (
+            <PlanEditor
+              text={planText}
+              onChange={setPlanText}
+              whenEnds={whenEnds}
+              onWhenEndsChange={setWhenEnds}
+            />
+          )}
+
           <div className="grid sm:grid-cols-2 gap-4">
             <Field label="Campaign name" hint="What you will recognise it by">
               <input
@@ -828,6 +1053,14 @@ function CreateDialog({
               onCreate({
                 name,
                 niche,
+                contentKind: contentKindValue,
+                ideaSource: ideaSourceValue,
+                whenPlanEnds: whenEnds,
+                // Sent with the campaign so the plan and the campaign are
+                // created together — a planned campaign that exists for a
+                // moment with no plan would be picked up by the scheduler and
+                // immediately stop itself.
+                planText: ideaSourceValue === 'planned' ? planText : '',
                 audience,
                 artStyle,
                 tone,
@@ -840,7 +1073,13 @@ function CreateDialog({
                 deliverEmail,
               })
             }
-            disabled={busy || !name.trim() || !niche.trim()}
+            disabled={
+              busy ||
+              !name.trim() ||
+              !niche.trim() ||
+              // A planned campaign with an empty plan has nothing to run.
+              (ideaSourceValue === 'planned' && parsePlan(planText).items.length === 0)
+            }
             className="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-600 text-white text-sm font-semibold disabled:opacity-50"
           >
             {busy ? 'Creating…' : 'Start the campaign'}

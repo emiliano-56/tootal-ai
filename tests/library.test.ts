@@ -267,11 +267,82 @@ describe('Google Drive', () => {
   })
 
   it('files uploads into one folder rather than loose in My Drive', () => {
-    expect(client).toContain("name: 'ComicTale AI'")
+    expect(client).toContain("name: 'ComicAgent AI'")
     expect(client).toContain('folderId')
   })
 
   it('records the backup against the library row', () => {
     expect(client).toMatch(/drive_file_id: result\.fileId/)
+  })
+})
+
+// ---------------------------------------------------------------------------
+//  One store, not two
+// ---------------------------------------------------------------------------
+//  Comics and colouring books each still have a table from before the library
+//  existed. Deleting in one place and not the other is how they drift, and
+//  both symptoms are bad:
+//
+//    - Delete in My Comics, the library row survives: History shows a card
+//      whose file is gone, and it still counts against the keep limit — so
+//      clearing space clears none.
+//    - Delete in History, the legacy row survives: My Comics lists a comic
+//      whose download 404s.
+
+describe('deleting cleans every store', () => {
+  it('removes the legacy row alongside the library one', () => {
+    const route = fs.readFileSync('app/api/library/route.ts', 'utf8')
+
+    expect(route).toMatch(/const legacy =[\s\S]{0,120}'comics'/)
+    expect(route).toContain("'colorings'")
+    expect(route).toMatch(/\.eq\('pdf_path', row\.path\)/)
+  })
+
+  it('scopes the legacy delete to the owner', () => {
+    // Matching on path alone would let one account delete another's row.
+    const route = fs.readFileSync('app/api/library/route.ts', 'utf8')
+
+    expect(route).toMatch(/\.eq\('pdf_path', row\.path\)\s*\n\s*\.eq\('user_id', row\.user_id\)/)
+  })
+
+  it('gives My Comics a single delete path rather than its own', () => {
+    const page = fs.readFileSync('app/(shell)/my-comics/page.tsx', 'utf8')
+
+    expect(page).toContain('/api/library/by-path')
+    // The direct storage + table delete it used to do.
+    expect(page).not.toMatch(/\.from\("comics"\)\s*\n\s*\.delete\(\)/)
+  })
+
+  it('checks ownership from the path on the by-path route', () => {
+    const route = fs.readFileSync('app/api/library/by-path/route.ts', 'utf8')
+
+    expect(route).toMatch(/path\.startsWith\(`\$\{session\.userId\}\/`\)/)
+  })
+
+  it('carries on when the file is already gone', () => {
+    // A missing object is the state the customer asked for; the rows still
+    // have to be cleaned up or the count stays wrong.
+    const route = fs.readFileSync('app/api/library/by-path/route.ts', 'utf8')
+
+    expect(route).toMatch(/already gone is the state we wanted/)
+  })
+})
+
+describe('the dashboard agrees with everything else', () => {
+  it('counts from the library rather than from three separate places', () => {
+    // Counting comics, colourings and a bucket listing separately let the
+    // dashboard disagree with History, My Library and the keep-limit at once.
+    const stats = fs.readFileSync('components/stats-row.tsx', 'utf8')
+
+    expect(stats).toContain("fetch('/api/library')")
+    expect(stats).toContain('quotas.comic?.used')
+    expect(stats).not.toContain("supabase.storage.from('video').list")
+    expect(stats).not.toMatch(/from\('comics'\)\.select/)
+  })
+
+  it('shows the keep-limit before a save is interrupted by it', () => {
+    const dashboard = fs.readFileSync('app/(shell)/dashboard/page.tsx', 'utf8')
+
+    expect(dashboard).toContain('LibraryCard')
   })
 })

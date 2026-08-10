@@ -2,8 +2,6 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import jsPDF from "jspdf"
-import html2canvas from "html2canvas"
 import toast from "react-hot-toast"
 import {
   BookOpen,
@@ -26,12 +24,17 @@ import { consumeFeature } from '@/lib/plans/use-feature'
 import { UsageBadge } from '@/components/usage-badge'
 import { uploadCover } from '@/lib/share/cover'
 import { useLibrarySave } from '@/components/use-library-save'
+import { useLanguage, LanguagePicker } from '@/components/language-picker'
+import { promptDirective } from '@/lib/i18n/languages'
 
 export default function Page() {
   const API = useGenerationApi()
 
   // The keep-limit, the full-library dialog and Drive backup all live here.
   const library = useLibrarySave()
+
+  // What language the story comes out in.
+  const language = useLanguage()
 
 
   const router = useRouter()
@@ -111,7 +114,23 @@ export default function Page() {
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify(form)
+        // The generation backend writes its own prompt, so the language
+        // instruction has to travel inside the idea rather than as a system
+        // message we control.
+        //
+        // `final_prompt` is the field this backend hands straight to the image
+        // model, and `scene_description` feeds it. Measured against the live
+        // backend, without naming them the whole prompt came back in Hindi —
+        // the story read perfectly and the artwork quietly fell apart, which
+        // is the worst kind of bug because the page still looks generated.
+        body: JSON.stringify({
+          ...form,
+          story_idea:
+            form.story_idea +
+            promptDirective(language.value, {
+              keepEnglish: ['final_prompt', 'scene_description'],
+            }),
+        })
       })
 
       const data = await res.json()
@@ -231,6 +250,15 @@ export default function Page() {
     try {
 
       const elements = document.querySelectorAll(".comic-page-export")
+
+      // Loaded here rather than at the top of the file. Together these two are
+      // over half a megabyte of JavaScript, and importing them statically put
+      // all of it in the bundle this page downloads and parses before it can
+      // be used — to support a button most visits never press.
+      const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
+        import("jspdf"),
+        import("html2canvas"),
+      ])
 
       const pdf = new jsPDF({
         orientation:
@@ -561,6 +589,14 @@ export default function Page() {
                 className="w-full h-32 rounded-xl bg-slate-50 p-3.5 outline-none resize-none text-slate-900 text-sm ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-400 focus:bg-white transition-all placeholder:text-slate-400"
               />
             </div>
+
+            {/* Next to the idea rather than in a settings panel: it changes
+                what you get back, so it belongs where you say what you want. */}
+            <LanguagePicker
+              value={language.value}
+              onChange={language.setValue}
+              allowed={language.allowed}
+            />
 
             <div className="h-px bg-slate-100" />
 

@@ -21,7 +21,7 @@ interface Allowances {
 
 const availablePlans = [
   {
-    name: 'Comic Tale AI FE',
+    name: 'ComicAgent AI FE',
     price: '$19-$27',
     type: 'FE',
     url: 'https://comictale.fun/fe',
@@ -32,7 +32,7 @@ const availablePlans = [
     ],
   },
   {
-    name: 'Comic Tale AI Unlimited',
+    name: 'ComicAgent AI Unlimited',
     price: '$67',
     type: 'OTO 1',
     url: 'https://comictale.fun/oto1',
@@ -51,7 +51,7 @@ const availablePlans = [
     ],
   },
   {
-    name: 'Comic Tale AI DFY',
+    name: 'ComicAgent AI DFY',
     price: '$77',
     type: 'OTO 2',
     url: 'https://comictale.fun/oto2',
@@ -67,7 +67,7 @@ const availablePlans = [
     ],
   },
   {
-    name: 'Comic Tale AI Traffic',
+    name: 'ComicAgent AI Traffic',
     price: '$47',
     type: 'OTO 3',
     url: 'https://comictale.fun/oto3',
@@ -84,7 +84,7 @@ const availablePlans = [
     ],
   },
   {
-    name: 'Comic Tale AI Enterprise',
+    name: 'ComicAgent AI Enterprise',
     price: '$77',
     type: 'OTO 4',
     url: 'https://comictale.fun/oto4',
@@ -104,7 +104,7 @@ const availablePlans = [
     ],
   },
   {
-    name: 'Comic Tale AI Agency',
+    name: 'ComicAgent AI Agency',
     price: '$97-$167',
     type: 'OTO 5',
     url: 'https://comictale.fun/oto5',
@@ -116,7 +116,7 @@ const availablePlans = [
     ],
   },
   {
-    name: 'Comic Tale AI MegaSuite',
+    name: 'ComicAgent AI MegaSuite',
     price: '$197',
     type: 'OTO 6',
     url: 'https://comictale.fun/oto6',
@@ -309,7 +309,7 @@ export default function MyPlanPage() {
                 </div>
               ) : (
                 <p className="text-gray-500 text-sm">
-                  This is your currently active ComicTale AI plan.
+                  This is your currently active ComicAgent AI plan.
                 </p>
               )}
             </div>

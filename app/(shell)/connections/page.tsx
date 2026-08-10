@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import { SocialConnections } from '@/components/social-connections'
 
 export const metadata = {
-  title: 'Connections - ComicTale AI',
+  title: 'Connections - ComicAgent AI',
   description: 'Connect the accounts Autopilot posts to',
 }
 

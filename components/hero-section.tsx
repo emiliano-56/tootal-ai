@@ -188,7 +188,7 @@ export function HeroSection() {
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
                 <span className="ml-2 text-[10px] font-semibold text-slate-500">
-                  ComicTale AI · Comic Studio
+                  ComicAgent AI · Comic Studio
                 </span>
               </div>
 

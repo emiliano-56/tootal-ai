@@ -2,7 +2,7 @@ import { PortalGate } from '@/components/console/portal-page'
 import { LeadsManager } from '@/components/console/leads-manager'
 import { getSessionContext, PLATFORM_TENANT_ID } from '@/lib/supabase/server'
 
-export const metadata = { title: 'Leads - ComicTale AI' }
+export const metadata = { title: 'Leads - ComicAgent AI' }
 
 export default async function Page() {
   const session = await getSessionContext()
