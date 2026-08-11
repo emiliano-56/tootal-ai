@@ -45,6 +45,7 @@ export const CATALOG = {
   'nav.bookCover': 'Book Cover',
   'nav.generatePrompt': 'Generate Prompt',
   'nav.characters': 'Character Studio',
+  'nav.activities': 'Activity Studio',
   'nav.myComics': 'My Comics',
   'nav.history': 'History',
   'nav.analytics': 'Analytics',

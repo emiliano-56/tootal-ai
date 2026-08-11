@@ -29,6 +29,7 @@ import {
   Share2,
   KeyRound,
   UsersRound,
+  Puzzle,
 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
@@ -98,6 +99,9 @@ const menuGroups: MenuGroup[] = [
       // Sits under Create rather than Library: a character is something you
       // make and then use, not something you file away.
       { icon: UsersRound, label: 'nav.characters', href: '/characters', badge: 'NEW' },
+      // Costs no generations at all, which is worth it being visible rather
+      // than buried inside the colouring book flow.
+      { icon: Puzzle, label: 'nav.activities', href: '/activities', badge: 'NEW' },
     ],
   },
   {

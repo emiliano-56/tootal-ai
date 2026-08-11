@@ -19,6 +19,7 @@ import { useLanguage, LanguagePicker } from '@/components/language-picker'
 import { CastPicker } from '@/components/cast-picker'
 import { PanelEditor } from '@/components/panel-editor'
 import type { EditablePanel } from '@/lib/comic/editor'
+import { FORMATS, format, type ComicFormat } from '@/lib/comic/formats'
 
 import { useGenerationApi } from '@/components/generation-config'
 import { consumeFeature } from '@/lib/plans/use-feature'
@@ -45,6 +46,11 @@ export function StoryComicAgent() {
 
   // Arriving from a DFY pack: the storybook prompt lands in the box.
   usePromptPrefill(setIdea)
+  // Comic, picture storybook or social strip. Each has its own brief, panel
+  // count and page shape — the machinery is the same, the product is not.
+  const [formatKey, setFormatKey] = useState<ComicFormat>('comic')
+  const spec = format(formatKey)
+
   const [pages, setPages] = useState(3)
   const [panelsPerPage, setPanelsPerPage] = useState(4)
   const [style, setStyle] = useState('Modern comic book, bold ink, vibrant colour')
@@ -115,6 +121,7 @@ export function StoryComicAgent() {
           audience,
           language: language.value,
           characterIds: castIds,
+          format: formatKey,
         }),
       })
       const scriptData = await scriptRes.json()
@@ -153,7 +160,9 @@ export function StoryComicAgent() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               prompt: `${panel.image_prompt}. Art style: ${style}.`,
-              aspect_ratio: '1:1',
+              // A picture book opens wide; a square illustration wastes half
+              // the spread.
+              aspect_ratio: spec.aspectRatio,
               // This is what actually keeps a face steady. The written
               // appearance in the prompt helps; the picture is what decides.
               ...(references.length > 0 ? { image_urls: references } : {}),
@@ -197,7 +206,9 @@ export function StoryComicAgent() {
         const p = rendered[i]
         setNote(`Lettering panel ${i + 1} of ${rendered.length}…`)
 
-        if (p.image && p.dialogues.length > 0) {
+        // A storybook sets its words under the picture, so lettering them
+        // into it would print the same sentence twice.
+        if (spec.lettering === 'bubbles' && p.image && p.dialogues.length > 0) {
           try {
             const composited = await renderPanelWithBubbles(p.image, p.dialogues)
 
@@ -337,6 +348,42 @@ export function StoryComicAgent() {
         <div className="space-y-4">
           <Card>
             <div className="space-y-4">
+              <Field label="What are you making?">
+                <div className="grid gap-2">
+                  {FORMATS.map((entry) => {
+                    const active = entry.key === formatKey
+
+                    return (
+                      <button
+                        key={entry.key}
+                        type="button"
+                        onClick={() => {
+                          setFormatKey(entry.key)
+                          // The panel count is part of what the format *is*,
+                          // so it follows rather than being left stale.
+                          setPanelsPerPage(entry.panelsPerPage)
+                          setPages(entry.defaultPages)
+                        }}
+                        className={`p-2.5 rounded-xl text-left ring-1 transition-colors ${
+                          active
+                            ? 'ring-indigo-500 bg-indigo-50'
+                            : 'ring-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        <p
+                          className={`text-[13px] font-semibold ${active ? 'text-indigo-900' : 'text-slate-900'}`}
+                        >
+                          {entry.label}
+                        </p>
+                        <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                          {entry.description}
+                        </p>
+                      </button>
+                    )
+                  })}
+                </div>
+              </Field>
+
               <Field label="Your idea *">
                 <textarea
                   value={idea}

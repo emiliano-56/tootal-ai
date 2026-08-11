@@ -3,6 +3,7 @@ import { completeJson, AiError } from '@/lib/ai/deepseek'
 import { promptDirective } from '@/lib/i18n/languages'
 import { loadCast } from '@/lib/characters/server'
 import { castDirective, referenceImages } from '@/lib/characters/cast'
+import { format } from '@/lib/comic/formats'
 
 /**
  * Story-to-Comic Agent — the writing half.
@@ -87,12 +88,18 @@ export async function POST(request: NextRequest) {
     const cast = await loadCast(body?.characterIds)
     const references = referenceImages(cast)
 
+    // A storybook and a social strip are the same machinery pointed
+    // differently: what changes is the brief, and it goes in ahead of the
+    // language and cast rules so those still get the last word.
+    const spec = format(body?.format)
+
     const script = await completeJson<ComicScript>({
       // Story, dialogue and captions translate. `image_prompt` and the
       // character `appearance` both go to the image model, so both stay
       // English — otherwise the art stops matching the story it illustrates.
       system:
         SYSTEM +
+        (spec.brief ? `\n\n${spec.brief}` : '') +
         promptDirective(language, { keepEnglish: ['image_prompt', 'appearance'] }) +
         castDirective(cast, references.length > 0),
       prompt: `Idea: ${idea}
@@ -118,7 +125,12 @@ Story length: about ${pages * 120} words.`,
     // them to each panel request. Sent from here rather than looked up in the
     // client, so the browser never has to be trusted with which pictures
     // belong to which account.
-    return NextResponse.json({ ...script, references, cast: cast.map((c) => c.name) })
+    return NextResponse.json({
+      ...script,
+      references,
+      cast: cast.map((c) => c.name),
+      format: spec.key,
+    })
   } catch (error) {
     if (error instanceof AiError) {
       return NextResponse.json({ error: error.message }, { status: error.status })
