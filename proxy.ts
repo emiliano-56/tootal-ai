@@ -124,6 +124,21 @@ export async function proxy(request: NextRequest) {
   if (!user) {
     if (isPublicRoute(pathname)) return response
 
+    // An API call gets an answer, not a login page.
+    //
+    // Redirecting one produces a 200 with HTML in it, so every `await
+    // res.json()` in the app throws "Unexpected token '<'" — a parse error
+    // that names nothing and points nowhere. Callers then take the catch
+    // branch and show whatever their failure state is, which is how an
+    // expired session turned the language picker into one language captioned
+    // "83 more are on the higher tiers".
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json(
+        { error: 'Not signed in' },
+        { status: 401, headers: { 'Cache-Control': 'no-store' } }
+      )
+    }
+
     // Deep links into a console land on that console's own sign-in page.
     const signInUrl = new URL(signInRouteFor(pathname), request.url)
     signInUrl.searchParams.set('redirectedFrom', pathname)

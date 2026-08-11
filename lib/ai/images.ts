@@ -41,18 +41,51 @@ export interface GeneratedImage {
  * requests; both are bounded, because a hung fetch here would hold the whole
  * scheduler open.
  */
+export interface ImageOptions {
+  aspectRatio?: string
+  /**
+   * Reference pictures for the illustrator.
+   *
+   * The backend takes these on all three image endpoints and honours them
+   * properly — measured against the live API, a reference came back redrawn
+   * in the requested style with the subject, markings and pose intact. It is
+   * what makes a character look like themselves twice.
+   *
+   * Each must be publicly fetchable: the backend loads them over the open
+   * internet, so a signed or local URL simply fails.
+   */
+  imageUrls?: string[]
+  /** Longer for an img2img job, which fetches before it draws. */
+  timeoutMs?: number
+}
+
 export async function generateImage(
   prompt: string,
-  aspectRatio = '1:1'
+  options: string | ImageOptions = '1:1'
 ): Promise<GeneratedImage | null> {
+  // The old signature took an aspect ratio string. Kept working because every
+  // existing caller uses it and a silent change of meaning would be worse
+  // than an overload.
+  const settings: ImageOptions = typeof options === 'string' ? { aspectRatio: options } : options
+
+  const aspectRatio = settings.aspectRatio ?? '1:1'
+  const references = (settings.imageUrls ?? []).filter(Boolean).slice(0, 4)
+  const timeout = settings.timeoutMs ?? (references.length > 0 ? 240_000 : IMAGE_TIMEOUT_MS)
+
   try {
     const { url } = await resolveGenerationBackend()
 
     const response = await fetch(`${url}/coloring/generate-image`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: prompt.slice(0, 2000), aspect_ratio: aspectRatio }),
-      signal: AbortSignal.timeout(IMAGE_TIMEOUT_MS),
+      body: JSON.stringify({
+        prompt: prompt.slice(0, 2000),
+        aspect_ratio: aspectRatio,
+        // Omitted entirely rather than sent as [] — the field is nullable and
+        // an empty array is a different thing from "no references".
+        ...(references.length > 0 ? { image_urls: references } : {}),
+      }),
+      signal: AbortSignal.timeout(timeout),
     })
 
     if (!response.ok) {
@@ -154,13 +187,57 @@ export async function storePreview(
 export async function renderPreview(
   userId: string,
   prompt: string,
-  options: { aspectRatio?: string; name?: string } = {}
+  options: { aspectRatio?: string; name?: string; imageUrls?: string[] } = {}
 ): Promise<string | null> {
-  const image = await generateImage(prompt, options.aspectRatio ?? '1:1')
+  const image = await generateImage(prompt, {
+    aspectRatio: options.aspectRatio ?? '1:1',
+    imageUrls: options.imageUrls,
+  })
 
   if (!image) return null
 
   return storePreview(userId, image, options.name)
+}
+
+export const CHARACTER_BUCKET = 'characters'
+
+/**
+ * Keep a character reference where the illustrator can fetch it.
+ *
+ * Three differences from `storePreview`, each of which matters:
+ *
+ *   - No JPEG conversion. A reference is drawn on plain white and is about to
+ *     be handed back to an image model; JPEG's ringing around hard edges is
+ *     exactly the kind of artefact that model would faithfully reproduce.
+ *   - The path comes back as well as the URL, because deleting a character
+ *     has to delete the file and a public URL is not a handle for that.
+ *   - Its own bucket, so a character reference is never swept up by whatever
+ *     cleans out expired share previews.
+ */
+export async function storeCharacterImage(
+  userId: string,
+  image: GeneratedImage,
+  name = 'reference'
+): Promise<{ path: string; url: string } | null> {
+  const extension = image.contentType.includes('jpeg') ? 'jpg' : 'png'
+  const safe = name.replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'reference'
+  // The user id leads, because the storage policy keys write access on it.
+  const path = `${userId}/${Date.now()}-${safe}.${extension}`
+
+  const { error } = await supabaseAdmin.storage
+    .from(CHARACTER_BUCKET)
+    .upload(path, image.bytes, { contentType: image.contentType, upsert: false })
+
+  if (error) {
+    console.error('[images] character upload failed:', error.message)
+    return null
+  }
+
+  const {
+    data: { publicUrl },
+  } = supabaseAdmin.storage.from(CHARACTER_BUCKET).getPublicUrl(path)
+
+  return { path, url: publicUrl }
 }
 
 /**

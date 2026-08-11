@@ -16,6 +16,9 @@ import {
   StepProgress,
 } from '@/components/agent-ui'
 import { useLanguage, LanguagePicker } from '@/components/language-picker'
+import { CastPicker } from '@/components/cast-picker'
+import { PanelEditor } from '@/components/panel-editor'
+import type { EditablePanel } from '@/lib/comic/editor'
 
 import { useGenerationApi } from '@/components/generation-config'
 import { consumeFeature } from '@/lib/plans/use-feature'
@@ -28,12 +31,12 @@ const STEPS = [
   { key: 'done', label: 'Comic ready' },
 ]
 
-interface RenderedPanel {
-  pageNumber: number
-  panelNumber: number
-  image: string
-  dialogues: Dialogue[]
-}
+/**
+ * `EditablePanel` rather than a bespoke shape: the editor needs an id to
+ * address a single panel and the prompt to redraw it, and keeping two
+ * near-identical types in step is how one of them drifts.
+ */
+type RenderedPanel = EditablePanel
 
 export function StoryComicAgent() {
   const API = useGenerationApi()
@@ -50,6 +53,16 @@ export function StoryComicAgent() {
   // Story, dialogue and captions follow this. The panel art prompts do not —
   // the route keeps those English so the pictures still come out right.
   const language = useLanguage()
+
+  // Saved characters to keep consistent across this comic and the next one.
+  const [castIds, setCastIds] = useState<string[]>([])
+
+  // Kept after the run so a single-panel redraw still gets the cast's
+  // reference pictures — a redraw that loses the face is not a fix.
+  const [references, setReferences] = useState<string[]>([])
+
+  // Layout per page, chosen in the editor and used by the export.
+  const [layouts, setLayouts] = useState<Record<number, string>>({})
 
   const [running, setRunning] = useState(false)
   const [stepIndex, setStepIndex] = useState(-1)
@@ -101,6 +114,7 @@ export function StoryComicAgent() {
           style,
           audience,
           language: language.value,
+          characterIds: castIds,
         }),
       })
       const scriptData = await scriptRes.json()
@@ -108,6 +122,15 @@ export function StoryComicAgent() {
 
       const comicScript: ComicScript = scriptData
       setScript(comicScript)
+
+      // The reference pictures come back with the script rather than being
+      // looked up here — the server decides which of the account's images may
+      // be sent, and the browser only relays them.
+      const references: string[] = Array.isArray(scriptData?.references)
+        ? scriptData.references
+        : []
+
+      setReferences(references)
 
       // ---- Step 2: artwork ------------------------------------------------
       setStepIndex(1)
@@ -131,6 +154,9 @@ export function StoryComicAgent() {
             body: JSON.stringify({
               prompt: `${panel.image_prompt}. Art style: ${style}.`,
               aspect_ratio: '1:1',
+              // This is what actually keeps a face steady. The written
+              // appearance in the prompt helps; the picture is what decides.
+              ...(references.length > 0 ? { image_urls: references } : {}),
             }),
           })
 
@@ -149,9 +175,13 @@ export function StoryComicAgent() {
         }
 
         rendered.push({
+          id: `p${page.page_number}-${panel.panel_number}-${i}`,
           pageNumber: page.page_number,
           panelNumber: panel.panel_number,
           image: imageData,
+          // Kept so the panel can be redrawn on its own later, without
+          // regenerating the script to find out what it was asked for.
+          prompt: panel.image_prompt,
           dialogues: (panel.dialogues ?? []) as Dialogue[],
         })
 
@@ -170,13 +200,17 @@ export function StoryComicAgent() {
         if (p.image && p.dialogues.length > 0) {
           try {
             const composited = await renderPanelWithBubbles(p.image, p.dialogues)
-            withBubbles.push({ ...p, image: composited })
+
+            // The clean drawing is kept alongside: bubbles are burned into the
+            // pixels, so editing them later has to start from a version that
+            // has none, or the new ones land on top of the old.
+            withBubbles.push({ ...p, image: composited, rawImage: p.image })
             continue
           } catch (err) {
             console.error('[story-comic] bubble render failed:', err)
           }
         }
-        withBubbles.push(p)
+        withBubbles.push({ ...p, rawImage: p.image })
       }
 
       setPanels(withBubbles)
@@ -332,8 +366,10 @@ export function StoryComicAgent() {
                 value={language.value}
                 onChange={language.setValue}
                 allowed={language.allowed}
-              answered={language.answered}
+                answered={language.answered}
               />
+
+              <CastPicker selected={castIds} onChange={setCastIds} />
 
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Pages">
@@ -450,32 +486,22 @@ export function StoryComicAgent() {
               )}
 
               {panels.length > 0 && (
-                <Card title="Panels" subtitle={`${panels.filter((p) => p.image).length} of ${panels.length} rendered`}>
-                  <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                    {panels.map((panel, i) => (
-                      <div
-                        key={`${panel.pageNumber}-${panel.panelNumber}-${i}`}
-                        className="rounded-xl overflow-hidden ring-1 ring-slate-200 bg-slate-50"
-                      >
-                        {panel.image ? (
-                          <img
-                            src={panel.image}
-                            alt={`Page ${panel.pageNumber} panel ${panel.panelNumber}`}
-                            className="w-full aspect-square object-cover"
-                          />
-                        ) : (
-                          <div className="w-full aspect-square flex items-center justify-center text-xs text-slate-400">
-                            Image unavailable
-                          </div>
-                        )}
-                        <div className="px-3 py-2 bg-white">
-                          <p className="text-[11px] font-semibold text-slate-500">
-                            Page {panel.pageNumber} · Panel {panel.panelNumber}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                <Card
+                  title="Panels"
+                  subtitle={`${panels.filter((p) => p.image).length} of ${panels.length} rendered — redraw or edit any one on its own`}
+                >
+                  <PanelEditor
+                    panels={panels}
+                    onChange={setPanels}
+                    api={API}
+                    references={references}
+                    artStyle={style}
+                    panelsPerPage={panelsPerPage}
+                    layouts={layouts}
+                    onLayoutChange={(page, key) =>
+                      setLayouts((current) => ({ ...current, [page]: key }))
+                    }
+                  />
                 </Card>
               )}
             </>

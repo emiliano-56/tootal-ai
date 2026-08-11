@@ -5,6 +5,7 @@ import {
   allowedLanguages,
   canUseLanguage,
   promptDirective,
+  resolveAllowed,
   voiceTag,
   isRtl,
   preferredLanguage,
@@ -70,6 +71,59 @@ describe('the language catalogue', () => {
     expect(language('zh')?.code).toBe('zh')
     // A region nobody catalogued still resolves to the base language.
     expect(language('zh-HK')?.code).toBe('zh')
+  })
+})
+
+describe('what the picker offers when the server has not answered', () => {
+  // The bug this replaces: the hook defaulted to ['en'], so a request that was
+  // in flight — or that failed — showed one language and captioned it
+  // "83 more are on the higher tiers". That is a claim about someone's plan,
+  // made on no evidence, and indistinguishable from a real restriction.
+
+  it('offers everything and claims nothing before an answer arrives', () => {
+    const { allowed, answered } = resolveAllowed(null)
+
+    expect(allowed).toHaveLength(LANGUAGES.length)
+    expect(answered).toBe(false)
+  })
+
+  it('does the same when the request failed', () => {
+    expect(resolveAllowed(undefined).answered).toBe(false)
+    expect(resolveAllowed('').answered).toBe(false)
+    expect(resolveAllowed({ error: 'Not signed in' }).answered).toBe(false)
+  })
+
+  it('treats an empty list as a failure, not as "no languages"', () => {
+    // No tier the business sells permits zero languages, so an empty array is
+    // far more likely to be a broken query than a real restriction — and
+    // rendering it would leave the customer with an empty dropdown.
+    const { allowed, answered } = resolveAllowed({ allowed: [] })
+
+    expect(allowed).toHaveLength(LANGUAGES.length)
+    expect(answered).toBe(false)
+  })
+
+  it('ignores junk inside the list', () => {
+    expect(resolveAllowed({ allowed: [null, 42, ''] }).answered).toBe(false)
+    expect(resolveAllowed({ allowed: ['en', null, 'hi'] }).allowed).toEqual(['en', 'hi'])
+  })
+
+  it('uses a real answer exactly, and only then admits a restriction', () => {
+    const { allowed, answered } = resolveAllowed({ allowed: ['en', 'es', 'fr', 'pt', 'hi'] })
+
+    expect(allowed).toEqual(['en', 'es', 'fr', 'pt', 'hi'])
+    expect(answered).toBe(true)
+  })
+
+  it('passes the full catalogue through as a real answer', () => {
+    // An unrestricted account gets every code back, and that is an answer —
+    // not a fallback — so `answered` must be true or the count would read as
+    // provisional forever.
+    const every = LANGUAGES.map((entry) => entry.code)
+    const { allowed, answered } = resolveAllowed({ allowed: every })
+
+    expect(allowed).toHaveLength(LANGUAGES.length)
+    expect(answered).toBe(true)
   })
 })
 

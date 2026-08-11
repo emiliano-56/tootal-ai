@@ -13,6 +13,7 @@ import {
   ChevronDown,
   ArrowLeft,
   FileText,
+  RefreshCw,
   Wand2
 } from "lucide-react"
 import { supabase } from "@/lib/supabase"
@@ -42,6 +43,11 @@ export default function Page() {
   const [loadingStory, setLoadingStory] = useState(false)
   const [loadingImages, setLoadingImages] = useState(false)
   const [loadingPDF, setLoadingPDF] = useState(false)
+
+  // Which page is being redrawn, or null. One at a time: the backend takes
+  // the better part of a minute per image and firing six at once is how a
+  // customer discovers their allowance is gone.
+  const [redrawing, setRedrawing] = useState<number | null>(null)
 
   const [comic, setComic] = useState<any>(null)
 
@@ -237,6 +243,67 @@ export default function Page() {
 
     setLoadingImages(false)
     toast.success(`Comic ready — ${comic.pages.length} pages`)
+  }
+
+  // =====================================================
+  // REDRAW ONE PAGE
+  // =====================================================
+
+  /**
+   * Draw a single page again.
+   *
+   * The whole reason this exists: one bad page out of eight used to mean
+   * regenerating all eight — the month's allowance spent twice and seven
+   * pages the customer was happy with replaced by different ones.
+   *
+   * It spends one generation, and says so on the button rather than in a
+   * dialog nobody reads.
+   */
+  async function redrawPage(index: number) {
+    const page = comic?.pages?.[index]
+
+    if (!page?.final_prompt) return
+
+    setRedrawing(index)
+
+    try {
+      const res = await fetch(`${API}/coloring/generate-image`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: page.final_prompt,
+          aspect_ratio: form.aspect_ratio
+        })
+      })
+
+      const data = await res.json()
+
+      if (!data?.image_url) throw new Error(data?.error || "The illustrator did not answer")
+
+      // Inlined rather than linked: the backend's URLs expire within the
+      // hour, and an exported PDF that fetches them would come out blank.
+      const imageRes = await fetch(data.image_url)
+      const blob = await imageRes.blob()
+
+      const base64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader()
+
+        reader.onloadend = () => resolve(reader.result as string)
+        reader.readAsDataURL(blob)
+      })
+
+      const pages = [...comic.pages]
+
+      pages[index] = { ...pages[index], image_url: base64 }
+
+      setComic({ ...comic, pages })
+      toast.success(`Page ${page.page_number} redrawn`)
+    } catch (err) {
+      console.log(err)
+      toast.error(err instanceof Error ? err.message : "Could not redraw that page")
+    } finally {
+      setRedrawing(null)
+    }
   }
 
   // =====================================================
@@ -989,6 +1056,30 @@ export default function Page() {
                   )}
 
                 </div>
+
+                {/* Redraw one page on its own.
+                    Before this, a single bad page meant regenerating all of
+                    them — the whole allowance spent again and every page the
+                    customer liked replaced with a different one. */}
+                {page.image_url && (
+                  <button
+                    onClick={() => redrawPage(index)}
+                    disabled={redrawing === index}
+                    className="mt-2 h-8 px-3 rounded-lg ring-1 ring-slate-200 bg-white text-[11px] font-semibold text-slate-600 inline-flex items-center gap-1.5 disabled:opacity-50 hover:bg-slate-50"
+                  >
+                    {redrawing === index ? (
+                      <>
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        Redrawing…
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="w-3 h-3" />
+                        Redraw this page
+                      </>
+                    )}
+                  </button>
+                )}
 
               </div>
 

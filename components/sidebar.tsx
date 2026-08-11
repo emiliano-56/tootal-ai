@@ -28,6 +28,7 @@ import {
   Bot,
   Share2,
   KeyRound,
+  UsersRound,
 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
@@ -94,6 +95,9 @@ const menuGroups: MenuGroup[] = [
       { icon: Video, label: 'nav.videoGenerator', href: '/video' },
       { icon: ImagePlus, label: 'nav.bookCover', href: '/cover' },
       { icon: Users, label: 'nav.generatePrompt', href: '/chat' },
+      // Sits under Create rather than Library: a character is something you
+      // make and then use, not something you file away.
+      { icon: UsersRound, label: 'nav.characters', href: '/characters', badge: 'NEW' },
     ],
   },
   {

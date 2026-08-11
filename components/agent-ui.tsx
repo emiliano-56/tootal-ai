@@ -80,15 +80,19 @@ export const inputClass =
 
 export function Field({
   label,
+  hint,
   children,
 }: {
   label: string
+  /** Sits under the input. For the sentence that stops the field being guessed at. */
+  hint?: string
   children: ReactNode
 }) {
   return (
     <div>
       <label className={fieldLabel}>{label}</label>
       {children}
+      {hint && <p className="mt-1 text-[11px] text-slate-400 leading-snug">{hint}</p>}
     </div>
   )
 }
