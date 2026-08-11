@@ -414,7 +414,7 @@ export function ProvidersManager() {
           rows={generationRows}
           columns={generationColumns}
           loading={loading}
-          emptyMessage="No backend configured — the app falls back to NEXT_PUBLIC_API_URL."
+          emptyMessage="No backend configured — generation falls back to the NEXT_PUBLIC_API_URL environment variable, read on the server."
         />
       </div>
 

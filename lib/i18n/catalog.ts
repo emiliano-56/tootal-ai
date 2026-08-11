@@ -46,6 +46,8 @@ export const CATALOG = {
   'nav.generatePrompt': 'Generate Prompt',
   'nav.characters': 'Character Studio',
   'nav.activities': 'Activity Studio',
+  'nav.publish': 'Publish',
+  'nav.batch': 'Batch & Styles',
   'nav.myComics': 'My Comics',
   'nav.history': 'History',
   'nav.analytics': 'Analytics',

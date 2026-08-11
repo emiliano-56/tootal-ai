@@ -147,9 +147,10 @@ export default function Page() {
   const [nicheOpen, setNicheOpen] = useState(false);
   const [selectedNiche, setSelectedNiche] = useState("");
 
-  const API_BASE =
-    process.env.NEXT_PUBLIC_API_URL ||
-    GENERATION_API_URL;
+  // The env variable used to win here, which pointed this page straight at
+  // the backend and put it back on the wrong side of CORS while every other
+  // page went through the proxy. There is one source now.
+  const API_BASE = GENERATION_API_URL;
 
 
 

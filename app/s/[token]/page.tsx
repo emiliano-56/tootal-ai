@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { resolveShare, countView } from '@/lib/share/links'
+import { Flipbook } from '@/components/flipbook'
 
 /**
  * The public page behind a share link.
@@ -121,15 +122,11 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
           ) : isVideo ? (
             <video src={url} controls playsInline className="w-full bg-black" />
           ) : isPdf ? (
-            // A PDF gets an object rather than an img; browsers that cannot
-            // inline it fall through to the download link below.
-            <object data={url} type="application/pdf" className="w-full h-[70vh]">
-              <div className="p-16 text-center">
-                <p className="text-slate-600 dark:text-slate-400">
-                  Your browser cannot show this here.
-                </p>
-              </div>
-            </object>
+            // A reader rather than an <object>. Handing the PDF to the browser
+            // gives a grey scrollbar on a desktop and a download prompt on
+            // most phones — and a phone is where a shared link is opened.
+            // The Flipbook falls back to the <object> if pdf.js cannot read it.
+            <Flipbook url={url} title={item.title} downloadUrl={url} />
           ) : (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={url} alt={item.title} className="w-full" />

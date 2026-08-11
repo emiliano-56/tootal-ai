@@ -52,6 +52,8 @@ const PUBLIC_PREFIXES = [
   '/api/cron',
   '/api/social/callback',
   '/s',
+  '/d',
+  '/api/d',
 ]
 
 function isPublicRoute(pathname: string) {
@@ -78,7 +80,10 @@ function isPublicRoute(pathname: string) {
  * one of them to the auth service, not the database. On a share link that is
  * most of the response time, and a post doing well is a lot of crawler hits.
  */
-const NO_SESSION_PREFIXES = ['/api/ipn', '/api/cron', '/api/social/callback', '/s']
+// /d and /api/d are a delivery link: a buyer with no account, following a
+// link from an email. Sending them to a sign-in page would make every file
+// sold undeliverable.
+const NO_SESSION_PREFIXES = ['/api/ipn', '/api/cron', '/api/social/callback', '/s', '/d', '/api/d']
 
 function needsNoSession(pathname: string) {
   return NO_SESSION_PREFIXES.some(

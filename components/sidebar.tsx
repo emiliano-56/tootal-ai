@@ -30,6 +30,8 @@ import {
   KeyRound,
   UsersRound,
   Puzzle,
+  BookMarked,
+  Layers3,
 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
@@ -110,6 +112,9 @@ const menuGroups: MenuGroup[] = [
       { icon: FolderOpen, label: 'nav.myComics', href: '/my-comics' },
       { icon: History, label: 'nav.history', href: '/history', badge: 'NEW' },
       { icon: BarChart3, label: 'nav.analytics', href: '/analytics' },
+      // Everything between a finished book and a listed one.
+      { icon: BookMarked, label: 'nav.publish', href: '/publish', badge: 'NEW' },
+      { icon: Layers3, label: 'nav.batch', href: '/batch', badge: 'NEW' },
     ],
   },
   {
